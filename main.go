@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -52,6 +53,7 @@ const (
 	ACT_BP_DI
 	ACT_SI
 	ACT_DI
+	ACT_DirectAddress
 	ACT_BX
 	ACT_BX_SI_D8
 	ACT_BX_DI_D8
@@ -72,12 +74,24 @@ const (
 )
 
 var addressCalculationTable = [][]AddressCalculationType{
-	{ACT_BX_SI, ACT_BX_DI, ACT_BP_SI, ACT_BP_DI, ACT_SI, ACT_DI, ACT_Invalid, ACT_BX},
+	{ACT_BX_SI, ACT_BX_DI, ACT_BP_SI, ACT_BP_DI, ACT_SI, ACT_DI, ACT_DirectAddress, ACT_BX},
 	{ACT_BX_SI_D8, ACT_BX_DI_D8, ACT_BP_SI_D8, ACT_BP_DI_D8, ACT_SI_D8, ACT_DI_D8, ACT_BP_D8, ACT_BX_D8},
 	{ACT_BX_SI_D16, ACT_BX_DI_D16, ACT_BP_SI_D16, ACT_BP_DI_D16, ACT_SI_D16, ACT_DI_D16, ACT_BP_D16, ACT_BX_D16},
 }
 
-type MemoryLocationType string
+type AddressCalculation struct {
+	Type         AddressCalculationType
+	Displacement int16
+}
+
+type DataLocationType int
+
+const (
+	DL_Invalid DataLocationType = iota
+	DL_Register
+	DL_Memory
+	DL_Immediate
+)
 
 var registerTable = [][]RegisterName{
 	{AL, CL, DL, BL, AH, CH, DH, BH},
@@ -86,12 +100,19 @@ var registerTable = [][]RegisterName{
 
 type Instruction struct {
 	Type InstructionType
-	Src  *MemoryLocation
-	Dst  *MemoryLocation
+	Src  *DataLocation
+	Dst  *DataLocation
 }
 
-type MemoryLocation struct {
-	Type MemoryLocationType
+type DataLocation struct {
+	Type DataLocationType
+
+	RegisterName RegisterName
+
+	AddressCalculation AddressCalculation
+
+	ImmediateValue int16
+	Wide           bool
 }
 
 func (t InstructionType) Name() string {
@@ -102,8 +123,8 @@ func (t InstructionType) Name() string {
 	return ""
 }
 
-func (a AddressCalculationType) String(displacement int16) string {
-	switch a {
+func (a AddressCalculation) String() string {
+	switch a.Type {
 	case ACT_BX_SI:
 		return "[bx + si]"
 	case ACT_BX_DI:
@@ -116,40 +137,60 @@ func (a AddressCalculationType) String(displacement int16) string {
 		return "[si]"
 	case ACT_DI:
 		return "[di]"
+	case ACT_DirectAddress:
+		return fmt.Sprintf("[%d]", a.Displacement)
 	case ACT_BX:
 		return "[bx]"
 	case ACT_BX_SI_D8:
-		return fmt.Sprintf("[bx + si + %d]", displacement)
+		return fmt.Sprintf("[bx + si + %d]", a.Displacement)
 	case ACT_BX_DI_D8:
-		return fmt.Sprintf("[bx + di + %d]", displacement)
+		return fmt.Sprintf("[bx + di + %d]", a.Displacement)
 	case ACT_BP_SI_D8:
-		return fmt.Sprintf("[bp + si + %d]", displacement)
+		return fmt.Sprintf("[bp + si + %d]", a.Displacement)
 	case ACT_BP_DI_D8:
-		return fmt.Sprintf("[bp + di + %d]", displacement)
+		return fmt.Sprintf("[bp + di + %d]", a.Displacement)
 	case ACT_SI_D8:
-		return fmt.Sprintf("[si + %d]", displacement)
+		return fmt.Sprintf("[si + %d]", a.Displacement)
 	case ACT_DI_D8:
-		return fmt.Sprintf("[di + %d]", displacement)
+		return fmt.Sprintf("[di + %d]", a.Displacement)
 	case ACT_BP_D8:
-		return fmt.Sprintf("[bp + %d]", displacement)
+		return fmt.Sprintf("[bp + %d]", a.Displacement)
 	case ACT_BX_D8:
-		return fmt.Sprintf("[bx + %d]", displacement)
+		return fmt.Sprintf("[bx + %d]", a.Displacement)
 	case ACT_BX_SI_D16:
-		return fmt.Sprintf("[bx + si + %d]", displacement)
+		return fmt.Sprintf("[bx + si + %d]", a.Displacement)
 	case ACT_BX_DI_D16:
-		return fmt.Sprintf("[bx + di + %d]", displacement)
+		return fmt.Sprintf("[bx + di + %d]", a.Displacement)
 	case ACT_BP_SI_D16:
-		return fmt.Sprintf("[bp + si + %d]", displacement)
+		return fmt.Sprintf("[bp + si + %d]", a.Displacement)
 	case ACT_BP_DI_D16:
-		return fmt.Sprintf("[bp + di + %d]", displacement)
+		return fmt.Sprintf("[bp + di + %d]", a.Displacement)
 	case ACT_SI_D16:
-		return fmt.Sprintf("[si + %d]", displacement)
+		return fmt.Sprintf("[si + %d]", a.Displacement)
 	case ACT_DI_D16:
-		return fmt.Sprintf("[di + %d]", displacement)
+		return fmt.Sprintf("[di + %d]", a.Displacement)
 	case ACT_BP_D16:
-		return fmt.Sprintf("[bp + %d]", displacement)
+		return fmt.Sprintf("[bp + %d]", a.Displacement)
 	case ACT_BX_D16:
-		return fmt.Sprintf("[bx + %d]", displacement)
+		return fmt.Sprintf("[bx + %d]", a.Displacement)
+	}
+	return ""
+}
+
+func (d DataLocation) String() string {
+	switch d.Type {
+	case DL_Register:
+		return string(d.RegisterName)
+	case DL_Immediate:
+		result := ""
+		if !d.Wide {
+			result += "byte "
+		} else {
+			result += "word "
+		}
+		return result + strconv.Itoa(int(d.ImmediateValue))
+	case DL_Memory:
+		return d.AddressCalculation.String()
 	}
 	return ""
 }
@@ -237,6 +278,34 @@ func assembleAndCompare(inputFileName string, inputFileContent []byte, result []
 	return nil
 }
 
+func Parse16BitValue(content []byte) int16 {
+	tmp := content[0]
+
+	highByte := int16(content[1])
+	return int16(tmp) | (highByte << 8)
+}
+
+func ParseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCalculation) {
+	currentByte := 0
+	addressCalculationType := addressCalculationTable[mod][rm]
+
+	displacement := int16(0)
+	if mod == 0b01 {
+		// Memory Mode, 8 bit displacement follows
+		displacement = int16(int8(content[currentByte]))
+		currentByte++
+	} else if mod == 0b10 || (mod == 0b00 && rm == 0b110) {
+		// Memory Mode, 16 bit displacement follows
+		displacement = Parse16BitValue(content[currentByte:])
+		currentByte += 2
+	}
+
+	return currentByte, AddressCalculation{
+		Type:         addressCalculationType,
+		Displacement: displacement,
+	}
+}
+
 func disassemble(content []byte) (string, error) {
 	result := "bits 16\n"
 
@@ -255,19 +324,58 @@ func disassemble(content []byte) (string, error) {
 			w := (b1 >> 3) & 0b00000001
 			reg := b1 & 0b00000111
 
-			tmp := content[currentByte]
-			currentByte++
 			data := int16(0)
 			if w == 0b0 {
-				data = int16(int8(tmp))
-			} else if w == 0b1 {
-				highByte := int16(content[currentByte])
-				data = int16(tmp) | (highByte << 8)
+				data = int16(int8(content[currentByte]))
 				currentByte++
+			} else if w == 0b1 {
+				data = Parse16BitValue(content[currentByte:])
+				currentByte += 2
 			}
 
-			destinationRegisterName := registerTable[w][reg]
-			result += fmt.Sprintf("%s %s, %d\n", instructionType.Name(), destinationRegisterName, data)
+			dst := DataLocation{
+				Type:         DL_Register,
+				RegisterName: registerTable[w][reg],
+			}
+			result += fmt.Sprintf("%s %s, %d\n", instructionType.Name(), dst.String(), data)
+			continue
+		}
+
+		if instructionType == IT_MovMemToAcc {
+			displacement := Parse16BitValue(content[currentByte:])
+			currentByte += 2
+
+			src := DataLocation{
+				Type: DL_Memory,
+				AddressCalculation: AddressCalculation{
+					Type:         ACT_DirectAddress,
+					Displacement: displacement,
+				},
+			}
+			dst := DataLocation{
+				Type:         DL_Register,
+				RegisterName: AX,
+			}
+			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+			continue
+		}
+
+		if instructionType == IT_MovAccToMem {
+			displacement := Parse16BitValue(content[currentByte:])
+			currentByte += 2
+
+			src := DataLocation{
+				Type:         DL_Register,
+				RegisterName: AX,
+			}
+			dst := DataLocation{
+				Type: DL_Memory,
+				AddressCalculation: AddressCalculation{
+					Type:         ACT_DirectAddress,
+					Displacement: displacement,
+				},
+			}
+			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
 			continue
 		}
 
@@ -280,46 +388,55 @@ func disassemble(content []byte) (string, error) {
 		reg := (b2 >> 3) & 0b00000111
 		rm := b2 & 0b00000111
 
-		if mod == 0b11 {
+		if instructionType == IT_MovRegMemToFromReg && mod == 0b11 {
 			// Register Mode (no displacement)
 			destinationRegisterName := registerTable[w][rm]
 			sourceRegisterName := registerTable[w][reg]
 			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), destinationRegisterName, sourceRegisterName)
 			continue
-		} else {
-			// Memory Mode
-			if rm == 0b110 && mod == 0b11 {
-				print(result)
-				return "", errors.New("(rm == 0b110) not implemented yet")
-			}
+		}
 
-			addressCalculationType := addressCalculationTable[mod][rm]
+		parsedBytes, addressCalculation := ParseAddressCalculation(content[currentByte:], mod, rm)
+		currentByte += parsedBytes
 
-			displacement := int16(0)
-			if mod == 0b01 {
-				// Memory Mode, 8 bit displacement follows
-				displacement = int16(int8(content[currentByte]))
-				currentByte++
-			} else if mod == 0b10 {
-				// Memory Mode, 16 bit displacement follows
-				tmp := content[currentByte]
-				currentByte++
-
-				highByte := int16(content[currentByte])
-				displacement = int16(tmp) | (highByte << 8)
-				currentByte++
-			}
+		if instructionType == IT_MovRegMemToFromReg {
+			finalAddressCalculation := addressCalculation.String()
 
 			d := (b1 >> 1) & 0b00000001
 			if d == 0b1 {
 				destinationRegisterName := registerTable[w][reg]
-				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), destinationRegisterName, addressCalculationType.String(displacement))
+				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), destinationRegisterName, finalAddressCalculation)
 				continue
 			} else {
 				sourceRegisterName := registerTable[w][reg]
-				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), addressCalculationType.String(displacement), sourceRegisterName)
+				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), finalAddressCalculation, sourceRegisterName)
 				continue
 			}
+		} else if instructionType == IT_MovImToRegMem {
+			tmp := content[currentByte]
+			currentByte++
+			data := int16(0)
+			dataKind := ""
+			if w == 0b0 {
+				dataKind = "byte"
+				data = int16(int8(tmp))
+			} else if w == 0b1 {
+				dataKind = "word"
+				highByte := int16(content[currentByte])
+				data = int16(tmp) | (highByte << 8)
+				currentByte++
+			}
+
+			if mod == 0b11 {
+				destinationRegisterName := registerTable[w][reg]
+				result += fmt.Sprintf("%s %s, %s %d\n", instructionType.Name(), destinationRegisterName, dataKind, data)
+				continue
+			} else {
+				result += fmt.Sprintf("%s %s, %s %d\n", instructionType.Name(), addressCalculation.String(), dataKind, data)
+				continue
+			}
+		} else {
+			return "", errors.New("not implemented yet")
 		}
 	}
 
@@ -329,7 +446,12 @@ func disassemble(content []byte) (string, error) {
 }
 
 func main() {
-	inputFiles := []string{"l_37.asm", "l_38.asm", "l_39.asm"}
+	inputFiles := []string{
+		"l_37.asm",
+		"l_38.asm",
+		"l_39.asm",
+		"l_40.asm",
+	}
 	for _, inputFile := range inputFiles {
 		cmd := exec.Command("nasm", inputFile)
 		stdout := new(strings.Builder)
