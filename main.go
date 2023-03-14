@@ -41,6 +41,10 @@ const (
 	IT_MovAccToMem
 	IT_MovRegMemToSegReg
 	IT_MovSegRegToRegMem
+
+	IT_AddRegMemWithRegToEither
+	IT_AddImToRegMem
+	IT_AddImToAccumulator
 )
 
 type AddressCalculationType int
@@ -118,6 +122,10 @@ type DataLocation struct {
 func (t InstructionType) Name() string {
 	if t > IT_Invalid && t < IT_MovSegRegToRegMem {
 		return "mov"
+	}
+
+	if t >= IT_AddRegMemWithRegToEither && t < IT_AddImToAccumulator {
+		return "add"
 	}
 
 	return ""
@@ -217,6 +225,17 @@ func getInstructionType(b byte) (InstructionType, error) {
 	} else if b == 0b10001100 {
 		// Segment register to register/memory
 		return IT_MovSegRegToRegMem, nil
+	}
+
+	if b>>2 == 0b000000 {
+		// Reg/memory with register to either
+		return IT_AddRegMemWithRegToEither, nil
+	} else if b>>2 == 0b100000 {
+		// Immediate to register/memory
+		return IT_AddImToRegMem, nil
+	} else if b>>1 == 0b0000010 {
+		// Immediate to accumulator
+		return IT_AddImToAccumulator, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -388,18 +407,48 @@ func disassemble(content []byte) (string, error) {
 		reg := (b2 >> 3) & 0b00000111
 		rm := b2 & 0b00000111
 
-		if instructionType == IT_MovRegMemToFromReg && mod == 0b11 {
-			// Register Mode (no displacement)
-			destinationRegisterName := registerTable[w][rm]
-			sourceRegisterName := registerTable[w][reg]
-			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), destinationRegisterName, sourceRegisterName)
+		if mod == 0b11 {
+			if instructionType == IT_MovRegMemToFromReg {
+				// Register Mode (no displacement)
+				src := DataLocation{
+					Type:         DL_Register,
+					RegisterName: registerTable[w][reg],
+				}
+				dst := DataLocation{
+					Type:         DL_Register,
+					RegisterName: registerTable[w][rm],
+				}
+				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+				continue
+			}
+
+			data := int16(0)
+			if w == 0b0 {
+				data = int16(int8(content[currentByte]))
+				currentByte++
+			} else if w == 0b1 {
+				data = Parse16BitValue(content[currentByte:])
+				currentByte += 2
+			}
+
+			src := DataLocation{
+				Type:           DL_Immediate,
+				ImmediateValue: data,
+				Wide:           w == 0b1,
+			}
+			fmt.Printf("%b\n", data)
+			dst := DataLocation{
+				Type:         DL_Register,
+				RegisterName: registerTable[w][rm],
+			}
+			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
 			continue
 		}
 
 		parsedBytes, addressCalculation := ParseAddressCalculation(content[currentByte:], mod, rm)
 		currentByte += parsedBytes
 
-		if instructionType == IT_MovRegMemToFromReg {
+		if instructionType == IT_MovRegMemToFromReg || instructionType == IT_AddRegMemWithRegToEither {
 			finalAddressCalculation := addressCalculation.String()
 
 			d := (b1 >> 1) & 0b00000001
@@ -412,19 +461,17 @@ func disassemble(content []byte) (string, error) {
 				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), finalAddressCalculation, sourceRegisterName)
 				continue
 			}
-		} else if instructionType == IT_MovImToRegMem {
-			tmp := content[currentByte]
-			currentByte++
+		} else if instructionType == IT_MovImToRegMem || instructionType == IT_AddImToRegMem {
 			data := int16(0)
 			dataKind := ""
 			if w == 0b0 {
 				dataKind = "byte"
-				data = int16(int8(tmp))
+				data = int16(int8(content[currentByte]))
+				currentByte++
 			} else if w == 0b1 {
 				dataKind = "word"
-				highByte := int16(content[currentByte])
-				data = int16(tmp) | (highByte << 8)
-				currentByte++
+				data = Parse16BitValue(content[currentByte:])
+				currentByte += 2
 			}
 
 			if mod == 0b11 {
@@ -451,6 +498,7 @@ func main() {
 		"l_38.asm",
 		"l_39.asm",
 		"l_40.asm",
+		"l_41.asm",
 	}
 	for _, inputFile := range inputFiles {
 		cmd := exec.Command("nasm", inputFile)
