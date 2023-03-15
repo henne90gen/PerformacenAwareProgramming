@@ -160,7 +160,7 @@ func (t InstructionType) IsImToRegMem() bool {
 }
 
 func (t InstructionType) HasSignExtension() bool {
-	return t == IT_AddImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithAcc
+	return t == IT_AddImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
 }
 
 func (a AddressCalculation) String() string {
