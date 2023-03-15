@@ -44,7 +44,15 @@ const (
 
 	IT_AddRegMemWithRegToEither
 	IT_AddImToRegMem
-	IT_AddImToAccumulator
+	IT_AddImToAcc
+
+	IT_SubRegMemWithRegToEither
+	IT_SubImToRegMem
+	IT_SubImFromAcc
+
+	IT_CmpRegMemAndReg
+	IT_CmpImWithRegMem
+	IT_CmpImWithAcc
 )
 
 type AddressCalculationType int
@@ -124,11 +132,35 @@ func (t InstructionType) Name() string {
 		return "mov"
 	}
 
-	if t >= IT_AddRegMemWithRegToEither && t < IT_AddImToAccumulator {
+	if t >= IT_AddRegMemWithRegToEither && t <= IT_AddImToAcc {
 		return "add"
 	}
 
+	if t >= IT_SubRegMemWithRegToEither && t <= IT_SubImFromAcc {
+		return "sub"
+	}
+
+	if t >= IT_CmpRegMemAndReg && t <= IT_CmpImWithAcc {
+		return "cmp"
+	}
+
 	return ""
+}
+
+func (t InstructionType) IsImToAcc() bool {
+	return t == IT_AddImToAcc || t == IT_SubImFromAcc || t == IT_CmpImWithAcc
+}
+
+func (t InstructionType) IsRegMemWithRegToEither() bool {
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg
+}
+
+func (t InstructionType) IsImToRegMem() bool {
+	return t == IT_MovImToRegMem || t == IT_AddImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
+}
+
+func (t InstructionType) HasSignExtension() bool {
+	return t == IT_AddImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithAcc
 }
 
 func (a AddressCalculation) String() string {
@@ -203,7 +235,8 @@ func (d DataLocation) String() string {
 	return ""
 }
 
-func getInstructionType(b byte) (InstructionType, error) {
+func getInstructionType(content []byte) (InstructionType, error) {
+	b := content[0]
 	if b>>2 == 0b100010 {
 		// Register/memory to/from register
 		return IT_MovRegMemToFromReg, nil
@@ -232,10 +265,36 @@ func getInstructionType(b byte) (InstructionType, error) {
 		return IT_AddRegMemWithRegToEither, nil
 	} else if b>>2 == 0b100000 {
 		// Immediate to register/memory
-		return IT_AddImToRegMem, nil
+		b2 := content[1]
+		reg := (b2 >> 3) & 0b111
+		if reg == 0b000 {
+			return IT_AddImToRegMem, nil
+		}
+		if reg == 0b101 {
+			return IT_SubImToRegMem, nil
+		}
+		if reg == 0b111 {
+			return IT_CmpImWithRegMem, nil
+		}
 	} else if b>>1 == 0b0000010 {
 		// Immediate to accumulator
-		return IT_AddImToAccumulator, nil
+		return IT_AddImToAcc, nil
+	}
+
+	if b>>2 == 0b001010 {
+		// Register/memory with register to either
+		return IT_SubRegMemWithRegToEither, nil
+	} else if b>>1 == 0b0010110 {
+		// Immediate from accumulator
+		return IT_SubImFromAcc, nil
+	}
+
+	if b>>2 == 0b001110 {
+		// Register/memory and register
+		return IT_CmpRegMemAndReg, nil
+	} else if b>>1 == 0b0011110 {
+		// Immediate with accumulator
+		return IT_CmpImWithAcc, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -290,7 +349,7 @@ func assembleAndCompare(inputFileName string, inputFileContent []byte, result []
 	}
 	for i, b := range assembled {
 		if b != inputFileContent[i] {
-			return errors.New("byte %d does not match")
+			return fmt.Errorf("byte does not match, expected %08b but got %08b", inputFileContent[i], b)
 		}
 	}
 
@@ -302,6 +361,19 @@ func Parse16BitValue(content []byte) int16 {
 
 	highByte := int16(content[1])
 	return int16(tmp) | (highByte << 8)
+}
+
+func ParseData(content []byte, wide bool) (int, int16) {
+	parsedBytes := 0
+	data := int16(0)
+	if !wide {
+		data = int16(int8(content[0]))
+		parsedBytes = 1
+	} else {
+		data = Parse16BitValue(content[0:])
+		parsedBytes = 2
+	}
+	return parsedBytes, data
 }
 
 func ParseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCalculation) {
@@ -330,14 +402,14 @@ func disassemble(content []byte) (string, error) {
 
 	currentByte := 0
 	for currentByte < len(content) {
-		b1 := content[currentByte]
-		currentByte++
-
-		instructionType, err := getInstructionType(b1)
+		instructionType, err := getInstructionType(content[currentByte:])
 		if err != nil {
 			println(result)
 			return "", err
 		}
+
+		b1 := content[currentByte]
+		currentByte++
 
 		if instructionType == IT_MovImToReg {
 			w := (b1 >> 3) & 0b00000001
@@ -398,17 +470,34 @@ func disassemble(content []byte) (string, error) {
 			continue
 		}
 
-		w := b1 & 0b00000001
+		w := b1 & 0b1
+
+		if instructionType.IsImToAcc() {
+			parsedBytes, data := ParseData(content[currentByte:], w == 0b1)
+			currentByte += parsedBytes
+
+			src := DataLocation{
+				Type:           DL_Immediate,
+				ImmediateValue: data,
+				Wide:           w == 0b1,
+			}
+			dst := DataLocation{
+				Type:         DL_Register,
+				RegisterName: registerTable[w][0],
+			}
+			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+			continue
+		}
 
 		b2 := content[currentByte]
 		currentByte++
 
 		mod := b2 >> 6
-		reg := (b2 >> 3) & 0b00000111
-		rm := b2 & 0b00000111
+		reg := (b2 >> 3) & 0b111
+		rm := b2 & 0b111
 
 		if mod == 0b11 {
-			if instructionType == IT_MovRegMemToFromReg {
+			if instructionType.IsRegMemWithRegToEither() {
 				// Register Mode (no displacement)
 				src := DataLocation{
 					Type:         DL_Register,
@@ -422,21 +511,16 @@ func disassemble(content []byte) (string, error) {
 				continue
 			}
 
-			data := int16(0)
-			if w == 0b0 {
-				data = int16(int8(content[currentByte]))
-				currentByte++
-			} else if w == 0b1 {
-				data = Parse16BitValue(content[currentByte:])
-				currentByte += 2
-			}
+			s := (b1 >> 1) & 0b1
+			wide := s == 0b0 && w == 0b1
+			parsedBytes, data := ParseData(content[currentByte:], wide)
+			currentByte += parsedBytes
 
 			src := DataLocation{
 				Type:           DL_Immediate,
 				ImmediateValue: data,
 				Wide:           w == 0b1,
 			}
-			fmt.Printf("%b\n", data)
 			dst := DataLocation{
 				Type:         DL_Register,
 				RegisterName: registerTable[w][rm],
@@ -448,10 +532,10 @@ func disassemble(content []byte) (string, error) {
 		parsedBytes, addressCalculation := ParseAddressCalculation(content[currentByte:], mod, rm)
 		currentByte += parsedBytes
 
-		if instructionType == IT_MovRegMemToFromReg || instructionType == IT_AddRegMemWithRegToEither {
+		if instructionType.IsRegMemWithRegToEither() {
 			finalAddressCalculation := addressCalculation.String()
 
-			d := (b1 >> 1) & 0b00000001
+			d := (b1 >> 1) & 0b1
 			if d == 0b1 {
 				destinationRegisterName := registerTable[w][reg]
 				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), destinationRegisterName, finalAddressCalculation)
@@ -461,29 +545,36 @@ func disassemble(content []byte) (string, error) {
 				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), finalAddressCalculation, sourceRegisterName)
 				continue
 			}
-		} else if instructionType == IT_MovImToRegMem || instructionType == IT_AddImToRegMem {
-			data := int16(0)
-			dataKind := ""
-			if w == 0b0 {
-				dataKind = "byte"
-				data = int16(int8(content[currentByte]))
-				currentByte++
-			} else if w == 0b1 {
-				dataKind = "word"
-				data = Parse16BitValue(content[currentByte:])
-				currentByte += 2
+		} else if instructionType.IsImToRegMem() {
+			wide := w == 0b1
+			if instructionType.HasSignExtension() {
+				s := (b1 >> 1) & 0b1
+				wide = wide && s == 0b0
+			}
+			parsedBytes, data := ParseData(content[currentByte:], wide)
+			currentByte += parsedBytes
+			src := DataLocation{
+				Type:           DL_Immediate,
+				ImmediateValue: data,
+				Wide:           w == 0b1,
 			}
 
+			var dst DataLocation
 			if mod == 0b11 {
-				destinationRegisterName := registerTable[w][reg]
-				result += fmt.Sprintf("%s %s, %s %d\n", instructionType.Name(), destinationRegisterName, dataKind, data)
-				continue
+				dst = DataLocation{
+					Type:         DL_Register,
+					RegisterName: registerTable[w][reg],
+				}
 			} else {
-				result += fmt.Sprintf("%s %s, %s %d\n", instructionType.Name(), addressCalculation.String(), dataKind, data)
-				continue
+				dst = DataLocation{
+					Type:               DL_Memory,
+					AddressCalculation: addressCalculation,
+				}
 			}
+			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+			continue
 		} else {
-			return "", errors.New("not implemented yet")
+			return "", errors.New("instruction decode not implemented yet")
 		}
 	}
 
@@ -498,6 +589,7 @@ func main() {
 		"l_38.asm",
 		"l_39.asm",
 		"l_40.asm",
+		"test.asm",
 		"l_41.asm",
 	}
 	for _, inputFile := range inputFiles {
