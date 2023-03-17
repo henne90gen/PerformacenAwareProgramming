@@ -434,7 +434,6 @@ func disassemble(content []byte) (string, error) {
 				Dst:  &dst,
 			}
 			instructions = append(instructions, inst)
-			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
 			continue
 		}
 
@@ -453,7 +452,12 @@ func disassemble(content []byte) (string, error) {
 				Type:         DL_Register,
 				RegisterName: AX,
 			}
-			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+			inst := Instruction{
+				Type: instructionType,
+				Src:  &src,
+				Dst:  &dst,
+			}
+			instructions = append(instructions, inst)
 			continue
 		}
 
@@ -472,7 +476,12 @@ func disassemble(content []byte) (string, error) {
 					Displacement: displacement,
 				},
 			}
-			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+			inst := Instruction{
+				Type: instructionType,
+				Src:  &src,
+				Dst:  &dst,
+			}
+			instructions = append(instructions, inst)
 			continue
 		}
 
@@ -491,7 +500,12 @@ func disassemble(content []byte) (string, error) {
 				Type:         DL_Register,
 				RegisterName: registerTable[w][0],
 			}
-			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+			inst := Instruction{
+				Type: instructionType,
+				Src:  &src,
+				Dst:  &dst,
+			}
+			instructions = append(instructions, inst)
 			continue
 		}
 
@@ -513,7 +527,12 @@ func disassemble(content []byte) (string, error) {
 					Type:         DL_Register,
 					RegisterName: registerTable[w][rm],
 				}
-				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+				inst := Instruction{
+					Type: instructionType,
+					Src:  &src,
+					Dst:  &dst,
+				}
+				instructions = append(instructions, inst)
 				continue
 			}
 
@@ -531,7 +550,12 @@ func disassemble(content []byte) (string, error) {
 				Type:         DL_Register,
 				RegisterName: registerTable[w][rm],
 			}
-			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+			inst := Instruction{
+				Type: instructionType,
+				Src:  &src,
+				Dst:  &dst,
+			}
+			instructions = append(instructions, inst)
 			continue
 		}
 
@@ -539,18 +563,29 @@ func disassemble(content []byte) (string, error) {
 		currentByte += parsedBytes
 
 		if instructionType.IsRegMemWithRegToEither() {
-			finalAddressCalculation := addressCalculation.String()
+			src := DataLocation{}
+			dst := DataLocation{}
 
 			d := (b1 >> 1) & 0b1
 			if d == 0b1 {
-				destinationRegisterName := registerTable[w][reg]
-				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), destinationRegisterName, finalAddressCalculation)
-				continue
+				dst.Type = DL_Register
+				dst.RegisterName = registerTable[w][reg]
+				src.Type = DL_Memory
+				src.AddressCalculation = addressCalculation
 			} else {
-				sourceRegisterName := registerTable[w][reg]
-				result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), finalAddressCalculation, sourceRegisterName)
-				continue
+				src.Type = DL_Register
+				src.RegisterName = registerTable[w][reg]
+				dst.Type = DL_Memory
+				dst.AddressCalculation = addressCalculation
 			}
+
+			inst := Instruction{
+				Type: instructionType,
+				Src:  &src,
+				Dst:  &dst,
+			}
+			instructions = append(instructions, inst)
+			continue
 		} else if instructionType.IsImToRegMem() {
 			wide := w == 0b1
 			if instructionType.HasSignExtension() {
@@ -577,11 +612,22 @@ func disassemble(content []byte) (string, error) {
 					AddressCalculation: addressCalculation,
 				}
 			}
-			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
+
+			inst := Instruction{
+				Type: instructionType,
+				Src:  &src,
+				Dst:  &dst,
+			}
+			instructions = append(instructions, inst)
 			continue
 		} else {
 			return "", errors.New("instruction decode not implemented yet")
 		}
+	}
+
+	result = "bits 16\n"
+	for _, instruction := range instructions {
+		result += fmt.Sprintf("%s %s, %s\n", instruction.Type.Name(), instruction.Dst.String(), instruction.Src.String())
 	}
 
 	print(result)
@@ -591,11 +637,11 @@ func disassemble(content []byte) (string, error) {
 
 func main() {
 	inputFiles := []string{
+		"test.asm",
 		"l_37.asm",
 		"l_38.asm",
 		"l_39.asm",
 		"l_40.asm",
-		"test.asm",
 		"l_41.asm",
 	}
 	for _, inputFile := range inputFiles {
