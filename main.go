@@ -400,6 +400,7 @@ func ParseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCal
 func disassemble(content []byte) (string, error) {
 	result := "bits 16\n"
 
+	instructions := make([]Instruction, 0)
 	currentByte := 0
 	for currentByte < len(content) {
 		instructionType, err := getInstructionType(content[currentByte:])
@@ -415,20 +416,25 @@ func disassemble(content []byte) (string, error) {
 			w := (b1 >> 3) & 0b00000001
 			reg := b1 & 0b00000111
 
-			data := int16(0)
-			if w == 0b0 {
-				data = int16(int8(content[currentByte]))
-				currentByte++
-			} else if w == 0b1 {
-				data = Parse16BitValue(content[currentByte:])
-				currentByte += 2
-			}
+			parsedBytes, data := ParseData(content[currentByte:], w == 0b1)
+			currentByte += parsedBytes
 
+			src := DataLocation{
+				Type:           DL_Immediate,
+				ImmediateValue: data,
+				Wide:           w == 0b1,
+			}
 			dst := DataLocation{
 				Type:         DL_Register,
 				RegisterName: registerTable[w][reg],
 			}
-			result += fmt.Sprintf("%s %s, %d\n", instructionType.Name(), dst.String(), data)
+			inst := Instruction{
+				Type: instructionType,
+				Src:  &src,
+				Dst:  &dst,
+			}
+			instructions = append(instructions, inst)
+			result += fmt.Sprintf("%s %s, %s\n", instructionType.Name(), dst.String(), src.String())
 			continue
 		}
 
