@@ -63,6 +63,9 @@ const (
 	IT_OutFixed
 	IT_OutVariable
 
+	IT_XLAT
+	IT_LoadEA
+
 	IT_AddRegMemWithRegToEither
 	IT_AddImToRegMem
 	IT_AddImToAcc
@@ -203,6 +206,14 @@ func (t InstructionType) Name() string {
 		return "out"
 	}
 
+	if t == IT_XLAT {
+		return "xlat"
+	}
+
+	if t == IT_LoadEA {
+		return "lea"
+	}
+
 	if t >= IT_AddRegMemWithRegToEither && t <= IT_AddImToAcc {
 		return "add"
 	}
@@ -303,7 +314,7 @@ func (t InstructionType) IsImToAcc() bool {
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -405,6 +416,10 @@ func (d DataLocation) String() string {
 
 func (i Instruction) String() string {
 	if i.Source == nil {
+		if i.Destination == nil {
+			return fmt.Sprintf("%s\n", i.Type.Name())
+		}
+
 		return fmt.Sprintf("%s %s\n", i.Type.Name(), i.Destination.String())
 	}
 
@@ -542,6 +557,14 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if (b >> 1) == 0b1110111 {
 		return IT_OutVariable, nil
+	}
+
+	if b == 0b11010111 {
+		return IT_XLAT, nil
+	}
+
+	if b == 0b10001101 {
+		return IT_LoadEA, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -739,6 +762,14 @@ func disassemble(content []byte) (string, error) {
 					Type:         DL_Register,
 					RegisterName: segmentRegisterTable[reg],
 				},
+			})
+			continue
+		}
+
+		if instructionType == IT_XLAT {
+			instructions = append(instructions, Instruction{
+				Type:        instructionType,
+				SizeInBytes: 1,
 			})
 			continue
 		}
@@ -990,7 +1021,7 @@ func disassemble(content []byte) (string, error) {
 			dst := DataLocation{}
 
 			d := (b1 >> 1) & 0b1
-			if d == 0b1 || instructionType == IT_ExchangeRegMemWithReg {
+			if d == 0b1 || instructionType == IT_ExchangeRegMemWithReg || instructionType == IT_LoadEA {
 				dst.Type = DL_Register
 				dst.RegisterName = registerTable[w][reg]
 				src.Type = DL_Memory
