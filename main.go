@@ -65,6 +65,8 @@ const (
 
 	IT_XLAT
 	IT_LoadEA
+	IT_LoadDS
+	IT_LoadES
 
 	IT_AddRegMemWithRegToEither
 	IT_AddImToRegMem
@@ -179,6 +181,8 @@ type DataLocation struct {
 	Wide           bool
 
 	LabelPosition int
+
+	AvoidSizeInfo bool
 }
 
 func (t InstructionType) Name() string {
@@ -212,6 +216,14 @@ func (t InstructionType) Name() string {
 
 	if t == IT_LoadEA {
 		return "lea"
+	}
+
+	if t == IT_LoadDS {
+		return "lds"
+	}
+
+	if t == IT_LoadES {
+		return "les"
 	}
 
 	if t >= IT_AddRegMemWithRegToEither && t <= IT_AddImToAcc {
@@ -314,7 +326,7 @@ func (t InstructionType) IsImToAcc() bool {
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -331,6 +343,10 @@ func (t InstructionType) IsJump() bool {
 
 func (t InstructionType) IsInOut() bool {
 	return t == IT_InFixed || t == IT_InVariable || t == IT_OutFixed || t == IT_OutVariable
+}
+
+func (t InstructionType) AlwaysToRegister() bool {
+	return t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
 }
 
 func (a AddressCalculation) String() string {
@@ -400,6 +416,9 @@ func (d DataLocation) String() string {
 		}
 		return result + strconv.Itoa(int(d.ImmediateValue))
 	case DL_Memory:
+		if d.AvoidSizeInfo {
+			return d.AddressCalculation.String()
+		}
 		result := ""
 		if !d.Wide {
 			result += "byte "
@@ -565,6 +584,14 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if b == 0b10001101 {
 		return IT_LoadEA, nil
+	}
+
+	if b == 0b11000101 {
+		return IT_LoadDS, nil
+	}
+
+	if b == 0b11000100 {
+		return IT_LoadES, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -1021,12 +1048,16 @@ func disassemble(content []byte) (string, error) {
 			dst := DataLocation{}
 
 			d := (b1 >> 1) & 0b1
-			if d == 0b1 || instructionType == IT_ExchangeRegMemWithReg || instructionType == IT_LoadEA {
+			if d == 0b1 || instructionType.AlwaysToRegister() {
+				if instructionType == IT_LoadES {
+					w = 0b1
+				}
 				dst.Type = DL_Register
 				dst.RegisterName = registerTable[w][reg]
 				src.Type = DL_Memory
 				src.AddressCalculation = addressCalculation
 				src.Wide = w == 0b1
+				src.AvoidSizeInfo = instructionType == IT_LoadDS || instructionType == IT_LoadES
 			} else {
 				src.Type = DL_Register
 				src.RegisterName = registerTable[w][reg]
