@@ -67,6 +67,10 @@ const (
 	IT_LoadEA
 	IT_LoadDS
 	IT_LoadES
+	IT_LoadAHWithFlags
+	IT_StoreAHWithFlags
+	IT_PushFlags
+	IT_PopFlags
 
 	IT_AddRegMemWithRegToEither
 	IT_AddImToRegMem
@@ -226,6 +230,22 @@ func (t InstructionType) Name() string {
 		return "les"
 	}
 
+	if t == IT_LoadAHWithFlags {
+		return "lahf"
+	}
+
+	if t == IT_StoreAHWithFlags {
+		return "sahf"
+	}
+
+	if t == IT_PushFlags {
+		return "pushf"
+	}
+
+	if t == IT_PopFlags {
+		return "popf"
+	}
+
 	if t >= IT_AddRegMemWithRegToEither && t <= IT_AddImToAcc {
 		return "add"
 	}
@@ -347,6 +367,10 @@ func (t InstructionType) IsInOut() bool {
 
 func (t InstructionType) AlwaysToRegister() bool {
 	return t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
+}
+
+func (t InstructionType) IsSingleByteInstruction() bool {
+	return t == IT_XLAT || t == IT_LoadAHWithFlags || t == IT_StoreAHWithFlags || t == IT_PushFlags || t == IT_PopFlags
 }
 
 func (a AddressCalculation) String() string {
@@ -594,6 +618,22 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_LoadES, nil
 	}
 
+	if b == 0b10011111 {
+		return IT_LoadAHWithFlags, nil
+	}
+
+	if b == 0b10011110 {
+		return IT_StoreAHWithFlags, nil
+	}
+
+	if b == 0b10011100 {
+		return IT_PushFlags, nil
+	}
+
+	if b == 0b10011101 {
+		return IT_PopFlags, nil
+	}
+
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
 }
 
@@ -793,7 +833,7 @@ func disassemble(content []byte) (string, error) {
 			continue
 		}
 
-		if instructionType == IT_XLAT {
+		if instructionType.IsSingleByteInstruction() {
 			instructions = append(instructions, Instruction{
 				Type:        instructionType,
 				SizeInBytes: 1,

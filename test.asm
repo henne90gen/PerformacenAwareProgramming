@@ -1,11 +1,27 @@
 bits 16
 
-lds ax, [bx + di + 1420]
-lds bx, [bp - 50]
-lds sp, [bp - 1003]
-lds di, [bx + si - 7]
+adc cx, [bp]
+adc dx, [bx + si]
+adc [bp + di + 5000], ah
+adc [bx], al
+adc sp, 392
+adc si, 5
+adc ax, 1000
+adc ah, 30
+adc al, 9
+adc cx, bx
+adc ch, al
 
-les ax, [bx + di + 1420]
-les bx, [bp - 50]
-les sp, [bp - 1003]
-les di, [bx + si - 7]
+inc ax
+inc cx
+inc dh
+inc al
+inc ah
+inc sp
+inc di
+inc byte [bp + 1002]
+inc word [bx + 39]
+inc byte [bx + si + 5]
+inc word [bp + di - 10044]
+inc word [9349]
+inc byte [bp]
