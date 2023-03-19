@@ -54,8 +54,26 @@ const (
 	IT_CmpImWithRegMem
 	IT_CmpImWithAcc
 
-	IT_JZ
-	IT_JNZ
+	IT_JE
+	IT_JNE
+	IT_JL
+	IT_JLE
+	IT_JB
+	IT_JBE
+	IT_JP
+	IT_JO
+	IT_JS
+	IT_JNL
+	IT_JNLE
+	IT_JNB
+	IT_JNBE
+	IT_JNP
+	IT_JNO
+	IT_JNS
+	IT_LOOP
+	IT_LOOPZ
+	IT_LOOPNZ
+	IT_JCXZ
 )
 
 type AddressCalculationType int
@@ -155,12 +173,84 @@ func (t InstructionType) Name() string {
 		return "cmp"
 	}
 
-	if t == IT_JZ {
-		return "jz"
+	if t == IT_JE {
+		return "je"
 	}
 
-	if t == IT_JNZ {
-		return "jnz"
+	if t == IT_JNE {
+		return "jne"
+	}
+
+	if t == IT_JL {
+		return "jl"
+	}
+
+	if t == IT_JLE {
+		return "jle"
+	}
+
+	if t == IT_JB {
+		return "jb"
+	}
+
+	if t == IT_JBE {
+		return "jbe"
+	}
+
+	if t == IT_JP {
+		return "jp"
+	}
+
+	if t == IT_JO {
+		return "jo"
+	}
+
+	if t == IT_JS {
+		return "js"
+	}
+
+	if t == IT_JNL {
+		return "jnl"
+	}
+
+	if t == IT_JNLE {
+		return "jnle"
+	}
+
+	if t == IT_JNB {
+		return "jnb"
+	}
+
+	if t == IT_JNBE {
+		return "jnbe"
+	}
+
+	if t == IT_JNP {
+		return "jnp"
+	}
+
+	if t == IT_JNO {
+		return "jno"
+	}
+
+	if t == IT_JNS {
+		return "jns"
+	}
+
+	if t == IT_LOOP {
+		return "loop"
+	}
+
+	if t == IT_LOOPZ {
+		return "loopz"
+	}
+
+	if t == IT_LOOPNZ {
+		return "loopnz"
+	}
+
+	if t == IT_JCXZ {
+		return "jcxz"
 	}
 
 	return ""
@@ -183,7 +273,7 @@ func (t InstructionType) HasSignExtension() bool {
 }
 
 func (t InstructionType) IsJump() bool {
-	return t == IT_JZ || t == IT_JNZ
+	return t == IT_JE || t == IT_JNE || t == IT_JL || t == IT_JLE || t == IT_JB || t == IT_JBE || t == IT_JP || t == IT_JO || t == IT_JS || t == IT_JNL || t == IT_JNLE || t == IT_JNB || t == IT_JNBE || t == IT_JNP || t == IT_JNO || t == IT_JNS || t == IT_LOOP || t == IT_LOOPZ || t == IT_LOOPNZ || t == IT_JCXZ
 }
 
 func (a AddressCalculation) String() string {
@@ -331,12 +421,27 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_CmpImWithAcc, nil
 	}
 
-	if b == 0b01110100 {
-		return IT_JZ, nil
+	jumpInstructionsTable := []InstructionType{
+		IT_JO, IT_JNO, IT_JB, IT_JNB, // 0000 - 0011
+		IT_JE, IT_JNE, IT_JBE, IT_JNBE, // 0100 - 0111
+		IT_JS, IT_JNS, IT_JP, IT_JNP, // 1000 - 1011
+		IT_JL, IT_JNL, IT_JLE, IT_JNLE, // 1100 - 1111
+	}
+	if (b >> 4) == 0b0111 {
+		return jumpInstructionsTable[b&0b1111], nil
 	}
 
-	if b == 0b01110101 {
-		return IT_JNZ, nil
+	if b == 0b11100010 {
+		return IT_LOOP, nil
+	}
+	if b == 0b11100001 {
+		return IT_LOOPZ, nil
+	}
+	if b == 0b11100000 {
+		return IT_LOOPNZ, nil
+	}
+	if b == 0b11100011 {
+		return IT_JCXZ, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
