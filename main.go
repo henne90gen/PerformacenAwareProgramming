@@ -58,6 +58,11 @@ const (
 	IT_ExchangeRegMemWithReg
 	IT_ExchangeRegWithAcc
 
+	IT_InFixed
+	IT_InVariable
+	IT_OutFixed
+	IT_OutVariable
+
 	IT_AddRegMemWithRegToEither
 	IT_AddImToRegMem
 	IT_AddImToAcc
@@ -190,6 +195,14 @@ func (t InstructionType) Name() string {
 		return "xchg"
 	}
 
+	if t >= IT_InFixed && t <= IT_InVariable {
+		return "in"
+	}
+
+	if t >= IT_OutFixed && t <= IT_OutVariable {
+		return "out"
+	}
+
 	if t >= IT_AddRegMemWithRegToEither && t <= IT_AddImToAcc {
 		return "add"
 	}
@@ -303,6 +316,10 @@ func (t InstructionType) HasSignExtension() bool {
 
 func (t InstructionType) IsJump() bool {
 	return t == IT_JE || t == IT_JNE || t == IT_JL || t == IT_JLE || t == IT_JB || t == IT_JBE || t == IT_JP || t == IT_JO || t == IT_JS || t == IT_JNL || t == IT_JNLE || t == IT_JNB || t == IT_JNBE || t == IT_JNP || t == IT_JNO || t == IT_JNS || t == IT_LOOP || t == IT_LOOPZ || t == IT_LOOPNZ || t == IT_JCXZ
+}
+
+func (t InstructionType) IsInOut() bool {
+	return t == IT_InFixed || t == IT_InVariable || t == IT_OutFixed || t == IT_OutVariable
 }
 
 func (a AddressCalculation) String() string {
@@ -509,6 +526,22 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if (b >> 3) == 0b10010 {
 		return IT_ExchangeRegWithAcc, nil
+	}
+
+	if (b >> 1) == 0b1110010 {
+		return IT_InFixed, nil
+	}
+
+	if (b >> 1) == 0b1110110 {
+		return IT_InVariable, nil
+	}
+
+	if (b >> 1) == 0b1110011 {
+		return IT_OutFixed, nil
+	}
+
+	if (b >> 1) == 0b1110111 {
+		return IT_OutVariable, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -755,6 +788,67 @@ func disassemble(content []byte) (string, error) {
 		}
 
 		w := b1 & 0b1
+
+		if instructionType.IsInOut() {
+			var src DataLocation
+			if instructionType == IT_InVariable || instructionType == IT_OutVariable {
+				src = DataLocation{
+					Type:         DL_Register,
+					RegisterName: DX,
+				}
+			} else {
+				parsedBytes, data := ParseData(content[currentByte:], false)
+				currentByte += parsedBytes
+				src = DataLocation{
+					Type:           DL_Immediate,
+					ImmediateValue: data,
+				}
+			}
+			dstRegisterName := AL
+			if w == 0b1 {
+				dstRegisterName = AX
+			}
+			dst := DataLocation{
+				Type:         DL_Register,
+				RegisterName: dstRegisterName,
+			}
+			if instructionType == IT_OutFixed || instructionType == IT_OutVariable {
+				tmp := src
+				src = dst
+				dst = tmp
+			}
+			inst := Instruction{
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
+			}
+			instructions = append(instructions, inst)
+			continue
+		}
+
+		if instructionType == IT_InVariable {
+			src := DataLocation{
+				Type:         DL_Register,
+				RegisterName: DX,
+			}
+			dstRegisterName := AL
+			if w == 0b1 {
+				dstRegisterName = AX
+			}
+			dst := DataLocation{
+				Type:         DL_Register,
+				RegisterName: dstRegisterName,
+			}
+			inst := Instruction{
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
+			}
+			instructions = append(instructions, inst)
+			continue
+		}
 
 		if instructionType == IT_MovMemToAcc {
 			displacement := Parse16BitValue(content[currentByte:])
