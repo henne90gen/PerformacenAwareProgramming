@@ -76,9 +76,17 @@ const (
 	IT_AddImToRegMem
 	IT_AddImToAcc
 
+	IT_AddWithCarryRegMemWithRegToEither
+	IT_AddWithCarryImToRegMem
+	IT_AddWithCarryImToAcc
+
 	IT_SubRegMemWithRegToEither
 	IT_SubImToRegMem
 	IT_SubImFromAcc
+
+	IT_SubWithBorrowRegMemWithRegToEither
+	IT_SubWithBorrowImToRegMem
+	IT_SubWithBorrowImFromAcc
 
 	IT_CmpRegMemAndReg
 	IT_CmpImWithRegMem
@@ -250,6 +258,10 @@ func (t InstructionType) Name() string {
 		return "add"
 	}
 
+	if t >= IT_AddWithCarryRegMemWithRegToEither && t <= IT_AddWithCarryImToAcc {
+		return "adc"
+	}
+
 	if t >= IT_SubRegMemWithRegToEither && t <= IT_SubImFromAcc {
 		return "sub"
 	}
@@ -346,15 +358,15 @@ func (t InstructionType) IsImToAcc() bool {
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
 }
 
 func (t InstructionType) IsImToRegMem() bool {
-	return t == IT_MovImToRegMem || t == IT_AddImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
+	return t == IT_MovImToRegMem || t == IT_AddImToRegMem || t == IT_AddWithCarryImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
 }
 
 func (t InstructionType) HasSignExtension() bool {
-	return t == IT_AddImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
+	return t == IT_AddImToRegMem || t == IT_AddWithCarryImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
 }
 
 func (t InstructionType) IsJump() bool {
@@ -504,6 +516,9 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		if reg == 0b000 {
 			return IT_AddImToRegMem, nil
 		}
+		if reg == 0b010 {
+			return IT_AddWithCarryImToRegMem, nil
+		}
 		if reg == 0b101 {
 			return IT_SubImToRegMem, nil
 		}
@@ -632,6 +647,14 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if b == 0b10011101 {
 		return IT_PopFlags, nil
+	}
+
+	if (b >> 2) == 0b000100 {
+		return IT_AddWithCarryRegMemWithRegToEither, nil
+	}
+
+	if (b >> 1) == 0b0001010 {
+		return IT_AddWithCarryImToAcc, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
