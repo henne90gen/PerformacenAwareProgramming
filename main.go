@@ -28,6 +28,11 @@ const (
 	BP RegisterName = "bp"
 	SI RegisterName = "si"
 	DI RegisterName = "di"
+
+	CS RegisterName = "cs"
+	DS RegisterName = "ds"
+	ES RegisterName = "es"
+	SS RegisterName = "ss"
 )
 
 type InstructionType int
@@ -41,6 +46,10 @@ const (
 	IT_MovAccToMem
 	IT_MovRegMemToSegReg
 	IT_MovSegRegToRegMem
+
+	IT_PushRegMem
+	IT_PushReg
+	IT_PushSegReg
 
 	IT_AddRegMemWithRegToEither
 	IT_AddImToRegMem
@@ -127,6 +136,7 @@ const (
 	DL_Label
 )
 
+var segmentRegisterTable = []RegisterName{ES, CS, SS, DS}
 var registerTable = [][]RegisterName{
 	{AL, CL, DL, BL, AH, CH, DH, BH},
 	{AX, CX, DX, BX, SP, BP, SI, DI},
@@ -159,6 +169,10 @@ type DataLocation struct {
 func (t InstructionType) Name() string {
 	if t > IT_Invalid && t < IT_MovSegRegToRegMem {
 		return "mov"
+	}
+
+	if t >= IT_PushRegMem && t <= IT_PushSegReg {
+		return "push"
 	}
 
 	if t >= IT_AddRegMemWithRegToEither && t <= IT_AddImToAcc {
@@ -343,7 +357,13 @@ func (d DataLocation) String() string {
 		}
 		return result + strconv.Itoa(int(d.ImmediateValue))
 	case DL_Memory:
-		return d.AddressCalculation.String()
+		result := ""
+		if !d.Wide {
+			result += "byte "
+		} else {
+			result += "word "
+		}
+		return result + d.AddressCalculation.String()
 	case DL_Label:
 		return fmt.Sprintf("label_%d", d.LabelPosition)
 	}
@@ -442,6 +462,18 @@ func getInstructionType(content []byte) (InstructionType, error) {
 	}
 	if b == 0b11100011 {
 		return IT_JCXZ, nil
+	}
+
+	if b == 0b11111111 {
+		return IT_PushRegMem, nil
+	}
+
+	if b&0b11111000 == 0b01010000 {
+		return IT_PushReg, nil
+	}
+
+	if b&0b11100110 == 0b00000110 {
+		return IT_PushSegReg, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -574,9 +606,22 @@ func insertLabel(labels []Label, position int) []Label {
 	return append(labels, Label{PositionInBytes: position})
 }
 
-func disassemble(content []byte) (string, error) {
+func stringifyInstructions(instructions []Instruction, labels []Label) string {
 	result := "bits 16\n"
+	currentByte := 0
+	currentLabel := 0
+	for _, instruction := range instructions {
+		result += instruction.String()
+		currentByte += instruction.SizeInBytes
+		if len(labels) > currentLabel && currentByte+1 > labels[currentLabel].PositionInBytes {
+			result += fmt.Sprintf("label_%d:\n", labels[currentLabel].PositionInBytes)
+			currentLabel++
+		}
+	}
+	return result
+}
 
+func disassemble(content []byte) (string, error) {
 	instructions := make([]Instruction, 0)
 	labels := make([]Label, 0)
 	currentByte := 0
@@ -585,12 +630,39 @@ func disassemble(content []byte) (string, error) {
 
 		instructionType, err := getInstructionType(content[currentByte:])
 		if err != nil {
+			result := stringifyInstructions(instructions, labels)
 			println(result)
 			return "", err
 		}
 
 		b1 := content[currentByte]
 		currentByte++
+
+		if instructionType == IT_PushReg {
+			reg := b1 & 0b111
+			instructions = append(instructions, Instruction{
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Destination: &DataLocation{
+					Type:         DL_Register,
+					RegisterName: registerTable[1][reg],
+				},
+			})
+			continue
+		}
+		if instructionType == IT_PushSegReg {
+			reg := (b1 >> 3) & 0b11
+			println(reg)
+			instructions = append(instructions, Instruction{
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Destination: &DataLocation{
+					Type:         DL_Register,
+					RegisterName: segmentRegisterTable[reg],
+				},
+			})
+			continue
+		}
 
 		if instructionType.IsJump() {
 			offset := int8(content[currentByte])
@@ -826,25 +898,27 @@ func disassemble(content []byte) (string, error) {
 			}
 			instructions = append(instructions, inst)
 			continue
+		} else if instructionType == IT_PushRegMem {
+			inst := Instruction{
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Destination: &DataLocation{
+					Type:               DL_Memory,
+					AddressCalculation: addressCalculation,
+					Wide:               true,
+				},
+			}
+			instructions = append(instructions, inst)
+			continue
 		} else {
+			result := stringifyInstructions(instructions, labels)
+			print(result)
 			return "", errors.New("instruction decode not implemented yet")
 		}
 	}
 
-	result = "bits 16\n"
-	currentByte = 0
-	currentLabel := 0
-	for _, instruction := range instructions {
-		result += instruction.String()
-		currentByte += instruction.SizeInBytes
-		if len(labels) > currentLabel && currentByte+1 > labels[currentLabel].PositionInBytes {
-			result += fmt.Sprintf("label_%d:\n", labels[currentLabel].PositionInBytes)
-			currentLabel++
-		}
-	}
-
+	result := stringifyInstructions(instructions, labels)
 	print(result)
-	fmt.Printf("%v\n", labels)
 
 	return result, nil
 }
@@ -857,6 +931,7 @@ func main() {
 		"l_39.asm",
 		"l_40.asm",
 		"l_41.asm",
+		"l_42.asm",
 	}
 	for _, inputFile := range inputFiles {
 		cmd := exec.Command("nasm", inputFile)
