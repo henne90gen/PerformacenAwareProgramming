@@ -728,6 +728,8 @@ func disassemble(content []byte) (string, error) {
 			continue
 		}
 
+		w := b1 & 0b1
+
 		if instructionType == IT_MovMemToAcc {
 			displacement := Parse16BitValue(content[currentByte:])
 			currentByte += 2
@@ -738,6 +740,7 @@ func disassemble(content []byte) (string, error) {
 					Type:         ACT_DirectAddress,
 					Displacement: displacement,
 				},
+				Wide: w == 0b1,
 			}
 			dst := DataLocation{
 				Type:         DL_Register,
@@ -767,6 +770,7 @@ func disassemble(content []byte) (string, error) {
 					Type:         ACT_DirectAddress,
 					Displacement: displacement,
 				},
+				Wide: w == 0b1,
 			}
 			inst := Instruction{
 				Type:        instructionType,
@@ -777,8 +781,6 @@ func disassemble(content []byte) (string, error) {
 			instructions = append(instructions, inst)
 			continue
 		}
-
-		w := b1 & 0b1
 
 		if instructionType.IsImToAcc() {
 			parsedBytes, data := ParseData(content[currentByte:], w == 0b1)
@@ -868,11 +870,13 @@ func disassemble(content []byte) (string, error) {
 				dst.RegisterName = registerTable[w][reg]
 				src.Type = DL_Memory
 				src.AddressCalculation = addressCalculation
+				src.Wide = w == 0b1
 			} else {
 				src.Type = DL_Register
 				src.RegisterName = registerTable[w][reg]
 				dst.Type = DL_Memory
 				dst.AddressCalculation = addressCalculation
+				dst.Wide = w == 0b1
 			}
 
 			inst := Instruction{
@@ -907,6 +911,7 @@ func disassemble(content []byte) (string, error) {
 				dst = DataLocation{
 					Type:               DL_Memory,
 					AddressCalculation: addressCalculation,
+					Wide:               w == 0b1,
 				}
 			}
 
