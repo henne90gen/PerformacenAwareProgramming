@@ -55,6 +55,9 @@ const (
 	IT_PopReg
 	IT_PopSegReg
 
+	IT_ExchangeRegMemWithReg
+	IT_ExchangeRegWithAcc
+
 	IT_AddRegMemWithRegToEither
 	IT_AddImToRegMem
 	IT_AddImToAcc
@@ -183,6 +186,10 @@ func (t InstructionType) Name() string {
 		return "pop"
 	}
 
+	if t >= IT_ExchangeRegMemWithReg && t <= IT_ExchangeRegWithAcc {
+		return "xchg"
+	}
+
 	if t >= IT_AddRegMemWithRegToEither && t <= IT_AddImToAcc {
 		return "add"
 	}
@@ -283,7 +290,7 @@ func (t InstructionType) IsImToAcc() bool {
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -496,6 +503,14 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_PopSegReg, nil
 	}
 
+	if (b >> 1) == 0b1000011 {
+		return IT_ExchangeRegMemWithReg, nil
+	}
+
+	if (b >> 3) == 0b10010 {
+		return IT_ExchangeRegWithAcc, nil
+	}
+
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
 }
 
@@ -658,18 +673,29 @@ func disassemble(content []byte) (string, error) {
 		b1 := content[currentByte]
 		currentByte++
 
-		if instructionType == IT_PushReg || instructionType == IT_PopReg {
+		if instructionType == IT_PushReg || instructionType == IT_PopReg || instructionType == IT_ExchangeRegWithAcc {
 			reg := b1 & 0b111
+			var src *DataLocation
+			dst := &DataLocation{
+				Type:         DL_Register,
+				RegisterName: registerTable[1][reg],
+			}
+			if instructionType == IT_ExchangeRegWithAcc {
+				src = dst
+				dst = &DataLocation{
+					Type:         DL_Register,
+					RegisterName: AX,
+				}
+			}
 			instructions = append(instructions, Instruction{
 				Type:        instructionType,
 				SizeInBytes: currentByte - startByte,
-				Destination: &DataLocation{
-					Type:         DL_Register,
-					RegisterName: registerTable[1][reg],
-				},
+				Destination: dst,
+				Source:      src,
 			})
 			continue
 		}
+
 		if instructionType == IT_PushSegReg || instructionType == IT_PopSegReg {
 			reg := (b1 >> 3) & 0b11
 			println(reg)
@@ -823,6 +849,11 @@ func disassemble(content []byte) (string, error) {
 					Type:         DL_Register,
 					RegisterName: registerTable[w][rm],
 				}
+				if instructionType == IT_ExchangeRegMemWithReg {
+					tmp := src
+					src = dst
+					dst = tmp
+				}
 				inst := Instruction{
 					Type:        instructionType,
 					SizeInBytes: currentByte - startByte,
@@ -865,7 +896,7 @@ func disassemble(content []byte) (string, error) {
 			dst := DataLocation{}
 
 			d := (b1 >> 1) & 0b1
-			if d == 0b1 {
+			if d == 0b1 || instructionType == IT_ExchangeRegMemWithReg {
 				dst.Type = DL_Register
 				dst.RegisterName = registerTable[w][reg]
 				src.Type = DL_Memory
@@ -887,7 +918,9 @@ func disassemble(content []byte) (string, error) {
 			}
 			instructions = append(instructions, inst)
 			continue
-		} else if instructionType.IsImToRegMem() {
+		}
+
+		if instructionType.IsImToRegMem() {
 			wide := w == 0b1
 			if instructionType.HasSignExtension() {
 				s := (b1 >> 1) & 0b1
@@ -923,7 +956,9 @@ func disassemble(content []byte) (string, error) {
 			}
 			instructions = append(instructions, inst)
 			continue
-		} else if instructionType == IT_PushRegMem || instructionType == IT_PopRegMem {
+		}
+
+		if instructionType == IT_PushRegMem || instructionType == IT_PopRegMem {
 			inst := Instruction{
 				Type:        instructionType,
 				SizeInBytes: currentByte - startByte,
@@ -935,11 +970,11 @@ func disassemble(content []byte) (string, error) {
 			}
 			instructions = append(instructions, inst)
 			continue
-		} else {
-			result := stringifyInstructions(instructions, labels)
-			print(result)
-			return "", errors.New("instruction decode not implemented yet")
 		}
+
+		result := stringifyInstructions(instructions, labels)
+		print(result)
+		return "", errors.New("instruction decode not implemented yet")
 	}
 
 	result := stringifyInstructions(instructions, labels)
