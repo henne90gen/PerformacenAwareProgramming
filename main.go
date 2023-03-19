@@ -53,6 +53,9 @@ const (
 	IT_CmpRegMemAndReg
 	IT_CmpImWithRegMem
 	IT_CmpImWithAcc
+
+	IT_JZ
+	IT_JNZ
 )
 
 type AddressCalculationType int
@@ -103,6 +106,7 @@ const (
 	DL_Register
 	DL_Memory
 	DL_Immediate
+	DL_Label
 )
 
 var registerTable = [][]RegisterName{
@@ -111,9 +115,14 @@ var registerTable = [][]RegisterName{
 }
 
 type Instruction struct {
-	Type InstructionType
-	Src  *DataLocation
-	Dst  *DataLocation
+	Type        InstructionType
+	SizeInBytes int
+	Destination *DataLocation
+	Source      *DataLocation
+}
+
+type Label struct {
+	PositionInBytes int
 }
 
 type DataLocation struct {
@@ -125,6 +134,8 @@ type DataLocation struct {
 
 	ImmediateValue int16
 	Wide           bool
+
+	LabelPosition int
 }
 
 func (t InstructionType) Name() string {
@@ -144,6 +155,14 @@ func (t InstructionType) Name() string {
 		return "cmp"
 	}
 
+	if t == IT_JZ {
+		return "jz"
+	}
+
+	if t == IT_JNZ {
+		return "jnz"
+	}
+
 	return ""
 }
 
@@ -161,6 +180,10 @@ func (t InstructionType) IsImToRegMem() bool {
 
 func (t InstructionType) HasSignExtension() bool {
 	return t == IT_AddImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
+}
+
+func (t InstructionType) IsJump() bool {
+	return t == IT_JZ || t == IT_JNZ
 }
 
 func (a AddressCalculation) String() string {
@@ -231,8 +254,19 @@ func (d DataLocation) String() string {
 		return result + strconv.Itoa(int(d.ImmediateValue))
 	case DL_Memory:
 		return d.AddressCalculation.String()
+	case DL_Label:
+		return fmt.Sprintf("label_%d", d.LabelPosition)
 	}
-	return ""
+
+	panic("unknown data location")
+}
+
+func (i Instruction) String() string {
+	if i.Source == nil {
+		return fmt.Sprintf("%s %s\n", i.Type.Name(), i.Destination.String())
+	}
+
+	return fmt.Sprintf("%s %s, %s\n", i.Type.Name(), i.Destination.String(), i.Source.String())
 }
 
 func getInstructionType(content []byte) (InstructionType, error) {
@@ -295,6 +329,14 @@ func getInstructionType(content []byte) (InstructionType, error) {
 	} else if b>>1 == 0b0011110 {
 		// Immediate with accumulator
 		return IT_CmpImWithAcc, nil
+	}
+
+	if b == 0b01110100 {
+		return IT_JZ, nil
+	}
+
+	if b == 0b01110101 {
+		return IT_JNZ, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -397,12 +439,45 @@ func ParseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCal
 	}
 }
 
+func insert(a []Label, index int, value Label) []Label {
+	if len(a) == index { // nil or empty slice or after last element
+		return append(a, value)
+	}
+	a = append(a[:index+1], a[index:]...) // index < len(a)
+	a[index] = value
+	return a
+}
+
+func insertLabel(labels []Label, position int) []Label {
+	println("Inserting label", position)
+	if len(labels) == 0 {
+		return append(labels, Label{PositionInBytes: position})
+	}
+
+	for i, label := range labels {
+		if label.PositionInBytes == position {
+			return labels
+		}
+
+		if label.PositionInBytes < position {
+			continue
+		}
+
+		return insert(labels, i, Label{PositionInBytes: position})
+	}
+
+	return append(labels, Label{PositionInBytes: position})
+}
+
 func disassemble(content []byte) (string, error) {
 	result := "bits 16\n"
 
 	instructions := make([]Instruction, 0)
+	labels := make([]Label, 0)
 	currentByte := 0
 	for currentByte < len(content) {
+		startByte := currentByte
+
 		instructionType, err := getInstructionType(content[currentByte:])
 		if err != nil {
 			println(result)
@@ -411,6 +486,24 @@ func disassemble(content []byte) (string, error) {
 
 		b1 := content[currentByte]
 		currentByte++
+
+		if instructionType.IsJump() {
+			offset := int8(content[currentByte])
+			currentByte++
+
+			labelPosition := currentByte + int(offset)
+			instruction := Instruction{
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Destination: &DataLocation{
+					Type:          DL_Label,
+					LabelPosition: labelPosition,
+				},
+			}
+			instructions = append(instructions, instruction)
+			labels = insertLabel(labels, labelPosition)
+			continue
+		}
 
 		if instructionType == IT_MovImToReg {
 			w := (b1 >> 3) & 0b00000001
@@ -429,9 +522,10 @@ func disassemble(content []byte) (string, error) {
 				RegisterName: registerTable[w][reg],
 			}
 			inst := Instruction{
-				Type: instructionType,
-				Src:  &src,
-				Dst:  &dst,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
 			}
 			instructions = append(instructions, inst)
 			continue
@@ -453,9 +547,10 @@ func disassemble(content []byte) (string, error) {
 				RegisterName: AX,
 			}
 			inst := Instruction{
-				Type: instructionType,
-				Src:  &src,
-				Dst:  &dst,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
 			}
 			instructions = append(instructions, inst)
 			continue
@@ -477,9 +572,10 @@ func disassemble(content []byte) (string, error) {
 				},
 			}
 			inst := Instruction{
-				Type: instructionType,
-				Src:  &src,
-				Dst:  &dst,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
 			}
 			instructions = append(instructions, inst)
 			continue
@@ -501,9 +597,10 @@ func disassemble(content []byte) (string, error) {
 				RegisterName: registerTable[w][0],
 			}
 			inst := Instruction{
-				Type: instructionType,
-				Src:  &src,
-				Dst:  &dst,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
 			}
 			instructions = append(instructions, inst)
 			continue
@@ -528,9 +625,10 @@ func disassemble(content []byte) (string, error) {
 					RegisterName: registerTable[w][rm],
 				}
 				inst := Instruction{
-					Type: instructionType,
-					Src:  &src,
-					Dst:  &dst,
+					Type:        instructionType,
+					SizeInBytes: currentByte - startByte,
+					Source:      &src,
+					Destination: &dst,
 				}
 				instructions = append(instructions, inst)
 				continue
@@ -551,9 +649,10 @@ func disassemble(content []byte) (string, error) {
 				RegisterName: registerTable[w][rm],
 			}
 			inst := Instruction{
-				Type: instructionType,
-				Src:  &src,
-				Dst:  &dst,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
 			}
 			instructions = append(instructions, inst)
 			continue
@@ -580,9 +679,10 @@ func disassemble(content []byte) (string, error) {
 			}
 
 			inst := Instruction{
-				Type: instructionType,
-				Src:  &src,
-				Dst:  &dst,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
 			}
 			instructions = append(instructions, inst)
 			continue
@@ -614,9 +714,10 @@ func disassemble(content []byte) (string, error) {
 			}
 
 			inst := Instruction{
-				Type: instructionType,
-				Src:  &src,
-				Dst:  &dst,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
+				Source:      &src,
+				Destination: &dst,
 			}
 			instructions = append(instructions, inst)
 			continue
@@ -626,11 +727,19 @@ func disassemble(content []byte) (string, error) {
 	}
 
 	result = "bits 16\n"
+	currentByte = 0
+	currentLabel := 0
 	for _, instruction := range instructions {
-		result += fmt.Sprintf("%s %s, %s\n", instruction.Type.Name(), instruction.Dst.String(), instruction.Src.String())
+		result += instruction.String()
+		currentByte += instruction.SizeInBytes
+		if len(labels) > currentLabel && currentByte+1 > labels[currentLabel].PositionInBytes {
+			result += fmt.Sprintf("label_%d:\n", labels[currentLabel].PositionInBytes)
+			currentLabel++
+		}
 	}
 
 	print(result)
+	fmt.Printf("%v\n", labels)
 
 	return result, nil
 }

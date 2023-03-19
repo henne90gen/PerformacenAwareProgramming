@@ -1,3 +1,6 @@
 bits 16
 
-sub bx, [bx+si]
+jnz label
+mov ax, bx
+label:
+mov ax, bx
