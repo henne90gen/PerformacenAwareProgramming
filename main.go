@@ -51,6 +51,10 @@ const (
 	IT_PushReg
 	IT_PushSegReg
 
+	IT_PopRegMem
+	IT_PopReg
+	IT_PopSegReg
+
 	IT_AddRegMemWithRegToEither
 	IT_AddImToRegMem
 	IT_AddImToAcc
@@ -173,6 +177,10 @@ func (t InstructionType) Name() string {
 
 	if t >= IT_PushRegMem && t <= IT_PushSegReg {
 		return "push"
+	}
+
+	if t >= IT_PopRegMem && t <= IT_PopSegReg {
+		return "pop"
 	}
 
 	if t >= IT_AddRegMemWithRegToEither && t <= IT_AddImToAcc {
@@ -472,8 +480,20 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_PushReg, nil
 	}
 
-	if b&0b11100110 == 0b00000110 {
+	if b&0b11100111 == 0b00000110 {
 		return IT_PushSegReg, nil
+	}
+
+	if b == 0b10001111 {
+		return IT_PopRegMem, nil
+	}
+
+	if b&0b11111000 == 0b01011000 {
+		return IT_PopReg, nil
+	}
+
+	if b&0b11100111 == 0b00000111 {
+		return IT_PopSegReg, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -638,7 +658,7 @@ func disassemble(content []byte) (string, error) {
 		b1 := content[currentByte]
 		currentByte++
 
-		if instructionType == IT_PushReg {
+		if instructionType == IT_PushReg || instructionType == IT_PopReg {
 			reg := b1 & 0b111
 			instructions = append(instructions, Instruction{
 				Type:        instructionType,
@@ -650,7 +670,7 @@ func disassemble(content []byte) (string, error) {
 			})
 			continue
 		}
-		if instructionType == IT_PushSegReg {
+		if instructionType == IT_PushSegReg || instructionType == IT_PopSegReg {
 			reg := (b1 >> 3) & 0b11
 			println(reg)
 			instructions = append(instructions, Instruction{
@@ -898,7 +918,7 @@ func disassemble(content []byte) (string, error) {
 			}
 			instructions = append(instructions, inst)
 			continue
-		} else if instructionType == IT_PushRegMem {
+		} else if instructionType == IT_PushRegMem || instructionType == IT_PopRegMem {
 			inst := Instruction{
 				Type:        instructionType,
 				SizeInBytes: currentByte - startByte,
