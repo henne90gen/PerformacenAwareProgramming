@@ -283,6 +283,10 @@ func (t InstructionType) Name() string {
 		return "sub"
 	}
 
+	if t >= IT_SubWithBorrowRegMemWithRegToEither && t <= IT_SubWithBorrowImFromAcc {
+		return "sbb"
+	}
+
 	if t >= IT_CmpRegMemAndReg && t <= IT_CmpImWithAcc {
 		return "cmp"
 	}
@@ -539,6 +543,9 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		if reg == 0b101 {
 			return IT_SubImToRegMem, nil
 		}
+		if reg == 0b011 {
+			return IT_SubWithBorrowImToRegMem, nil
+		}
 		if reg == 0b111 {
 			return IT_CmpImWithRegMem, nil
 		}
@@ -674,13 +681,28 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_AddWithCarryImToAcc, nil
 	}
 
-	fmt.Printf("%b %b\n", b, content[1])
 	if (b>>1) == 0b1111111 && (content[1]>>3)&0b111 == 0b000 {
 		return IT_IncRegMem, nil
 	}
 
 	if (b >> 3) == 0b01000 {
 		return IT_IncReg, nil
+	}
+
+	if b == 0b00110111 {
+		return IT_AsciiAdjustForAdd, nil
+	}
+
+	if b == 0b00100111 {
+		return IT_DecimalAdjustForAdd, nil
+	}
+
+	if (b >> 2) == 0b000110 {
+		return IT_SubWithBorrowRegMemWithRegToEither, nil
+	}
+
+	if (b >> 1) == 0b0001110 {
+		return IT_SubWithBorrowImFromAcc, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
