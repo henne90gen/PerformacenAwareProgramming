@@ -80,6 +80,11 @@ const (
 	IT_AddWithCarryImToRegMem
 	IT_AddWithCarryImToAcc
 
+	IT_IncRegMem
+	IT_IncReg
+	IT_AsciiAdjustForAdd
+	IT_DecimalAdjustForAdd
+
 	IT_SubRegMemWithRegToEither
 	IT_SubImToRegMem
 	IT_SubImFromAcc
@@ -262,6 +267,18 @@ func (t InstructionType) Name() string {
 		return "adc"
 	}
 
+	if t >= IT_IncRegMem && t <= IT_IncReg {
+		return "inc"
+	}
+
+	if t == IT_AsciiAdjustForAdd {
+		return "aaa"
+	}
+
+	if t == IT_DecimalAdjustForAdd {
+		return "daa"
+	}
+
 	if t >= IT_SubRegMemWithRegToEither && t <= IT_SubImFromAcc {
 		return "sub"
 	}
@@ -354,15 +371,15 @@ func (t InstructionType) Name() string {
 }
 
 func (t InstructionType) IsImToAcc() bool {
-	return t == IT_AddImToAcc || t == IT_SubImFromAcc || t == IT_CmpImWithAcc
+	return t == IT_AddImToAcc || t == IT_AddWithCarryImToAcc || t == IT_SubImFromAcc || t == IT_SubWithBorrowImFromAcc || t == IT_CmpImWithAcc
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_SubRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_IncRegMem || t == IT_SubRegMemWithRegToEither || t == IT_SubWithBorrowRegMemWithRegToEither || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
 }
 
 func (t InstructionType) IsImToRegMem() bool {
-	return t == IT_MovImToRegMem || t == IT_AddImToRegMem || t == IT_AddWithCarryImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
+	return t == IT_MovImToRegMem || t == IT_AddImToRegMem || t == IT_AddWithCarryImToRegMem || t == IT_SubImToRegMem || t == IT_SubWithBorrowImToRegMem || t == IT_CmpImWithRegMem
 }
 
 func (t InstructionType) HasSignExtension() bool {
@@ -382,7 +399,7 @@ func (t InstructionType) AlwaysToRegister() bool {
 }
 
 func (t InstructionType) IsSingleByteInstruction() bool {
-	return t == IT_XLAT || t == IT_LoadAHWithFlags || t == IT_StoreAHWithFlags || t == IT_PushFlags || t == IT_PopFlags
+	return t == IT_XLAT || t == IT_LoadAHWithFlags || t == IT_StoreAHWithFlags || t == IT_PushFlags || t == IT_PopFlags || t == IT_AsciiAdjustForAdd || t == IT_DecimalAdjustForAdd
 }
 
 func (a AddressCalculation) String() string {
@@ -569,7 +586,7 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_JCXZ, nil
 	}
 
-	if b == 0b11111111 {
+	if b == 0b11111111 && (content[1]>>3)&0b111 == 0b110 {
 		return IT_PushRegMem, nil
 	}
 
@@ -581,7 +598,7 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_PushSegReg, nil
 	}
 
-	if b == 0b10001111 {
+	if b == 0b10001111 && (content[1]>>3)&0b111 == 0b000 {
 		return IT_PopRegMem, nil
 	}
 
@@ -655,6 +672,15 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if (b >> 1) == 0b0001010 {
 		return IT_AddWithCarryImToAcc, nil
+	}
+
+	fmt.Printf("%b %b\n", b, content[1])
+	if (b>>1) == 0b1111111 && (content[1]>>3)&0b111 == 0b000 {
+		return IT_IncRegMem, nil
+	}
+
+	if (b >> 3) == 0b01000 {
+		return IT_IncReg, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -819,7 +845,7 @@ func disassemble(content []byte) (string, error) {
 		b1 := content[currentByte]
 		currentByte++
 
-		if instructionType == IT_PushReg || instructionType == IT_PopReg || instructionType == IT_ExchangeRegWithAcc {
+		if instructionType == IT_PushReg || instructionType == IT_PopReg || instructionType == IT_ExchangeRegWithAcc || instructionType == IT_IncReg {
 			reg := b1 & 0b111
 			var src *DataLocation
 			dst := &DataLocation{
@@ -1056,11 +1082,11 @@ func disassemble(content []byte) (string, error) {
 		if mod == 0b11 {
 			if instructionType.IsRegMemWithRegToEither() {
 				// Register Mode (no displacement)
-				src := DataLocation{
+				src := &DataLocation{
 					Type:         DL_Register,
 					RegisterName: registerTable[w][reg],
 				}
-				dst := DataLocation{
+				dst := &DataLocation{
 					Type:         DL_Register,
 					RegisterName: registerTable[w][rm],
 				}
@@ -1069,11 +1095,14 @@ func disassemble(content []byte) (string, error) {
 					src = dst
 					dst = tmp
 				}
+				if instructionType == IT_IncRegMem {
+					src = nil
+				}
 				inst := Instruction{
 					Type:        instructionType,
 					SizeInBytes: currentByte - startByte,
-					Source:      &src,
-					Destination: &dst,
+					Source:      src,
+					Destination: dst,
 				}
 				instructions = append(instructions, inst)
 				continue
@@ -1107,8 +1136,8 @@ func disassemble(content []byte) (string, error) {
 		currentByte += parsedBytes
 
 		if instructionType.IsRegMemWithRegToEither() {
-			src := DataLocation{}
-			dst := DataLocation{}
+			src := &DataLocation{}
+			dst := &DataLocation{}
 
 			d := (b1 >> 1) & 0b1
 			if d == 0b1 || instructionType.AlwaysToRegister() {
@@ -1129,11 +1158,16 @@ func disassemble(content []byte) (string, error) {
 				dst.Wide = w == 0b1
 			}
 
+			if instructionType == IT_IncRegMem {
+				dst = src
+				src = nil
+			}
+
 			inst := Instruction{
 				Type:        instructionType,
 				SizeInBytes: currentByte - startByte,
-				Source:      &src,
-				Destination: &dst,
+				Source:      src,
+				Destination: dst,
 			}
 			instructions = append(instructions, inst)
 			continue
