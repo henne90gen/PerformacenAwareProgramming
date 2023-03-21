@@ -103,6 +103,9 @@ const (
 	IT_CmpImWithRegMem
 	IT_CmpImWithAcc
 
+	IT_AsciiAdjustForSubtract
+	IT_DecimalAdjustForSubtract
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -305,6 +308,14 @@ func (t InstructionType) Name() string {
 		return "cmp"
 	}
 
+	if t == IT_AsciiAdjustForSubtract {
+		return "aas"
+	}
+
+	if t == IT_DecimalAdjustForSubtract {
+		return "das"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -417,7 +428,7 @@ func (t InstructionType) AlwaysToRegister() bool {
 }
 
 func (t InstructionType) IsSingleByteInstruction() bool {
-	return t == IT_XLAT || t == IT_LoadAHWithFlags || t == IT_StoreAHWithFlags || t == IT_PushFlags || t == IT_PopFlags || t == IT_AsciiAdjustForAdd || t == IT_DecimalAdjustForAdd
+	return t == IT_XLAT || t == IT_LoadAHWithFlags || t == IT_StoreAHWithFlags || t == IT_PushFlags || t == IT_PopFlags || t == IT_AsciiAdjustForAdd || t == IT_DecimalAdjustForAdd || t == IT_AsciiAdjustForSubtract || t == IT_DecimalAdjustForSubtract
 }
 
 func (a AddressCalculation) String() string {
@@ -727,8 +738,16 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_DecReg, nil
 	}
 
-	if (b >> 1) == 0b1111011 {
+	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b011 {
 		return IT_Neg, nil
+	}
+
+	if b == 0b00111111 {
+		return IT_AsciiAdjustForSubtract, nil
+	}
+
+	if b == 0b00101111 {
+		return IT_DecimalAdjustForSubtract, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
