@@ -324,6 +324,10 @@ func (t InstructionType) Name() string {
 		return "mul"
 	}
 
+	if t == IT_MultiplySigned {
+		return "imul"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -412,7 +416,7 @@ func (t InstructionType) IsImToAcc() bool {
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_IncRegMem || t == IT_SubRegMemWithRegToEither || t == IT_SubWithBorrowRegMemWithRegToEither || t == IT_DecRegMem || t == IT_Neg || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES || t == IT_Multiply
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_IncRegMem || t == IT_SubRegMemWithRegToEither || t == IT_SubWithBorrowRegMemWithRegToEither || t == IT_DecRegMem || t == IT_Neg || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES || t == IT_Multiply || t == IT_MultiplySigned
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -440,7 +444,7 @@ func (t InstructionType) IsSingleByteInstruction() bool {
 }
 
 func (t InstructionType) IsSingleOperandInstruction() bool {
-	return t == IT_IncRegMem || t == IT_DecRegMem || t == IT_Neg || t == IT_Multiply
+	return t == IT_IncRegMem || t == IT_DecRegMem || t == IT_Neg || t == IT_Multiply || t == IT_MultiplySigned
 }
 
 func (a AddressCalculation) String() string {
@@ -764,6 +768,10 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b100 {
 		return IT_Multiply, nil
+	}
+
+	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b101 {
+		return IT_MultiplySigned, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
