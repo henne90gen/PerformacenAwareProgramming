@@ -1287,9 +1287,11 @@ func main() {
 			panic(err)
 		}
 
-		err = os.Remove(assembledInputFile)
-		if err != nil {
-			panic(err)
+		if !strings.HasPrefix(inputFile, "computer_enhance") {
+			err = os.Remove(assembledInputFile)
+			if err != nil {
+				panic(err)
+			}
 		}
 
 		result, err := disassemble(content)
