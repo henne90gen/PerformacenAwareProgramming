@@ -106,6 +106,10 @@ const (
 	IT_AsciiAdjustForSubtract
 	IT_DecimalAdjustForSubtract
 
+	IT_Multiply
+	IT_MultiplySigned
+	IT_AsciiAdjustForMultiply
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -316,6 +320,10 @@ func (t InstructionType) Name() string {
 		return "das"
 	}
 
+	if t == IT_Multiply {
+		return "mul"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -404,7 +412,7 @@ func (t InstructionType) IsImToAcc() bool {
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_IncRegMem || t == IT_SubRegMemWithRegToEither || t == IT_SubWithBorrowRegMemWithRegToEither || t == IT_DecRegMem || t == IT_Neg || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_IncRegMem || t == IT_SubRegMemWithRegToEither || t == IT_SubWithBorrowRegMemWithRegToEither || t == IT_DecRegMem || t == IT_Neg || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES || t == IT_Multiply
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -429,6 +437,10 @@ func (t InstructionType) AlwaysToRegister() bool {
 
 func (t InstructionType) IsSingleByteInstruction() bool {
 	return t == IT_XLAT || t == IT_LoadAHWithFlags || t == IT_StoreAHWithFlags || t == IT_PushFlags || t == IT_PopFlags || t == IT_AsciiAdjustForAdd || t == IT_DecimalAdjustForAdd || t == IT_AsciiAdjustForSubtract || t == IT_DecimalAdjustForSubtract
+}
+
+func (t InstructionType) IsSingleOperandInstruction() bool {
+	return t == IT_IncRegMem || t == IT_DecRegMem || t == IT_Neg || t == IT_Multiply
 }
 
 func (a AddressCalculation) String() string {
@@ -750,6 +762,10 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_DecimalAdjustForSubtract, nil
 	}
 
+	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b100 {
+		return IT_Multiply, nil
+	}
+
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
 }
 
@@ -1040,29 +1056,6 @@ func disassemble(content []byte) (string, error) {
 			continue
 		}
 
-		if instructionType == IT_InVariable {
-			src := DataLocation{
-				Type:         DL_Register,
-				RegisterName: DX,
-			}
-			dstRegisterName := AL
-			if w == 0b1 {
-				dstRegisterName = AX
-			}
-			dst := DataLocation{
-				Type:         DL_Register,
-				RegisterName: dstRegisterName,
-			}
-			inst := Instruction{
-				Type:        instructionType,
-				SizeInBytes: currentByte - startByte,
-				Source:      &src,
-				Destination: &dst,
-			}
-			instructions = append(instructions, inst)
-			continue
-		}
-
 		if instructionType == IT_MovMemToAcc {
 			displacement := Parse16BitValue(content[currentByte:])
 			currentByte += 2
@@ -1161,7 +1154,7 @@ func disassemble(content []byte) (string, error) {
 					src = dst
 					dst = tmp
 				}
-				if instructionType == IT_IncRegMem || instructionType == IT_DecRegMem || instructionType == IT_Neg {
+				if instructionType.IsSingleOperandInstruction() {
 					src = nil
 				}
 				inst := Instruction{
@@ -1224,7 +1217,7 @@ func disassemble(content []byte) (string, error) {
 				dst.Wide = w == 0b1
 			}
 
-			if instructionType == IT_IncRegMem || instructionType == IT_DecRegMem || instructionType == IT_Neg {
+			if instructionType.IsSingleOperandInstruction() {
 				dst = src
 				src = nil
 			}
