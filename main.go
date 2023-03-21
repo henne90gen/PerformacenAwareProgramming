@@ -97,6 +97,8 @@ const (
 	IT_DecRegMem
 	IT_DecReg
 
+	IT_Neg
+
 	IT_CmpRegMemAndReg
 	IT_CmpImWithRegMem
 	IT_CmpImWithAcc
@@ -295,6 +297,10 @@ func (t InstructionType) Name() string {
 		return "dec"
 	}
 
+	if t == IT_Neg {
+		return "neg"
+	}
+
 	if t >= IT_CmpRegMemAndReg && t <= IT_CmpImWithAcc {
 		return "cmp"
 	}
@@ -387,7 +393,7 @@ func (t InstructionType) IsImToAcc() bool {
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_IncRegMem || t == IT_SubRegMemWithRegToEither || t == IT_SubWithBorrowRegMemWithRegToEither || t == IT_DecRegMem || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
+	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_IncRegMem || t == IT_SubRegMemWithRegToEither || t == IT_SubWithBorrowRegMemWithRegToEither || t == IT_DecRegMem || t == IT_Neg || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -719,6 +725,10 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if (b >> 3) == 0b01001 {
 		return IT_DecReg, nil
+	}
+
+	if (b >> 1) == 0b1111011 {
+		return IT_Neg, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -1132,7 +1142,7 @@ func disassemble(content []byte) (string, error) {
 					src = dst
 					dst = tmp
 				}
-				if instructionType == IT_IncRegMem || instructionType == IT_DecRegMem {
+				if instructionType == IT_IncRegMem || instructionType == IT_DecRegMem || instructionType == IT_Neg {
 					src = nil
 				}
 				inst := Instruction{
@@ -1195,7 +1205,7 @@ func disassemble(content []byte) (string, error) {
 				dst.Wide = w == 0b1
 			}
 
-			if instructionType == IT_IncRegMem || instructionType == IT_DecRegMem {
+			if instructionType == IT_IncRegMem || instructionType == IT_DecRegMem || instructionType == IT_Neg {
 				dst = src
 				src = nil
 			}
