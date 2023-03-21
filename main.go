@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -709,7 +710,8 @@ func getInstructionType(content []byte) (InstructionType, error) {
 }
 
 func assembleAndCompare(inputFileName string, inputFileContent []byte, result []byte) error {
-	tmpFile, err := os.CreateTemp(".", inputFileName+"-*.asm")
+	dir, fileName := filepath.Split(inputFileName)
+	tmpFile, err := os.CreateTemp(dir, fileName+"-*.asm")
 	if err != nil {
 		return err
 	}
@@ -815,7 +817,6 @@ func insert(a []Label, index int, value Label) []Label {
 }
 
 func insertLabel(labels []Label, position int) []Label {
-	println("Inserting label", position)
 	if len(labels) == 0 {
 		return append(labels, Label{PositionInBytes: position})
 	}
@@ -892,7 +893,6 @@ func disassemble(content []byte) (string, error) {
 
 		if instructionType == IT_PushSegReg || instructionType == IT_PopSegReg {
 			reg := (b1 >> 3) & 0b11
-			println(reg)
 			instructions = append(instructions, Instruction{
 				Type:        instructionType,
 				SizeInBytes: currentByte - startByte,
@@ -1261,12 +1261,12 @@ func disassemble(content []byte) (string, error) {
 func main() {
 	inputFiles := []string{
 		"test.asm",
-		"l_37.asm",
-		"l_38.asm",
-		"l_39.asm",
-		"l_40.asm",
-		"l_41.asm",
-		"l_42.asm",
+		"computer_enhance/perfaware/part1/listing_0037_single_register_mov.asm",
+		"computer_enhance/perfaware/part1/listing_0038_many_register_mov.asm",
+		"computer_enhance/perfaware/part1/listing_0039_more_movs.asm",
+		"computer_enhance/perfaware/part1/listing_0040_challenge_movs.asm",
+		"computer_enhance/perfaware/part1/listing_0041_add_sub_cmp_jnz.asm",
+		"computer_enhance/perfaware/part1/listing_0042_completionist_decode.asm",
 	}
 	for _, inputFile := range inputFiles {
 		cmd := exec.Command("nasm", inputFile)
