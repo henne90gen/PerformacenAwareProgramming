@@ -1,15 +1,9 @@
 bits 16
 
-div bl
-div sp
-div byte [bx + si + 2990]
-div word [bp + di + 1000]
-
-; idiv ax
-; idiv si
-; idiv byte [bp + si]
-; idiv word [bx + 493]
-
-; aad
-; cbw
-; cwd
+shl ah, 1
+shr ax, 1
+sar bx, 1
+rol cx, 1
+ror dh, 1
+rcl sp, 1
+rcr bp, 1

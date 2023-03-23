@@ -110,6 +110,22 @@ const (
 	IT_MultiplySigned
 	IT_AsciiAdjustForMultiply
 
+	IT_Divide
+	IT_DivideSigned
+	IT_AsciiAdjustForDivide
+
+	IT_ConvertByteToWord
+	IT_ConvertWordToDoubleWord
+
+	IT_Not
+	IT_ShiftLeft
+	IT_ShiftLogicRight
+	IT_ShiftArithmeticRight
+	IT_RotateLeft
+	IT_RotateRight
+	IT_RotateThroughCarryFlagLeft
+	IT_RotateThroughCarryFlagRight
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -332,6 +348,30 @@ func (t InstructionType) Name() string {
 		return "aam"
 	}
 
+	if t == IT_Divide {
+		return "div"
+	}
+
+	if t == IT_DivideSigned {
+		return "idiv"
+	}
+
+	if t == IT_AsciiAdjustForDivide {
+		return "aad"
+	}
+
+	if t == IT_ConvertByteToWord {
+		return "cbw"
+	}
+
+	if t == IT_ConvertWordToDoubleWord {
+		return "cwd"
+	}
+
+	if t == IT_Not {
+		return "not"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -420,35 +460,102 @@ func (t InstructionType) IsImToAcc() bool {
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
-	return t == IT_MovRegMemToFromReg || t == IT_AddRegMemWithRegToEither || t == IT_AddWithCarryRegMemWithRegToEither || t == IT_IncRegMem || t == IT_SubRegMemWithRegToEither || t == IT_SubWithBorrowRegMemWithRegToEither || t == IT_DecRegMem || t == IT_Neg || t == IT_CmpRegMemAndReg || t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES || t == IT_Multiply || t == IT_MultiplySigned
+	return t == IT_MovRegMemToFromReg ||
+		t == IT_AddRegMemWithRegToEither ||
+		t == IT_AddWithCarryRegMemWithRegToEither ||
+		t == IT_IncRegMem ||
+		t == IT_SubRegMemWithRegToEither ||
+		t == IT_SubWithBorrowRegMemWithRegToEither ||
+		t == IT_DecRegMem ||
+		t == IT_Neg ||
+		t == IT_CmpRegMemAndReg ||
+		t == IT_ExchangeRegMemWithReg ||
+		t == IT_LoadEA ||
+		t == IT_LoadDS ||
+		t == IT_LoadES ||
+		t == IT_Multiply ||
+		t == IT_MultiplySigned ||
+		t == IT_Divide ||
+		t == IT_DivideSigned ||
+		t == IT_Not
 }
 
 func (t InstructionType) IsImToRegMem() bool {
-	return t == IT_MovImToRegMem || t == IT_AddImToRegMem || t == IT_AddWithCarryImToRegMem || t == IT_SubImToRegMem || t == IT_SubWithBorrowImToRegMem || t == IT_CmpImWithRegMem
+	return t == IT_MovImToRegMem ||
+		t == IT_AddImToRegMem ||
+		t == IT_AddWithCarryImToRegMem ||
+		t == IT_SubImToRegMem ||
+		t == IT_SubWithBorrowImToRegMem ||
+		t == IT_CmpImWithRegMem
 }
 
 func (t InstructionType) HasSignExtension() bool {
-	return t == IT_AddImToRegMem || t == IT_AddWithCarryImToRegMem || t == IT_SubImToRegMem || t == IT_CmpImWithRegMem
+	return t == IT_AddImToRegMem ||
+		t == IT_AddWithCarryImToRegMem ||
+		t == IT_SubImToRegMem ||
+		t == IT_CmpImWithRegMem
 }
 
 func (t InstructionType) IsJump() bool {
-	return t == IT_JE || t == IT_JNE || t == IT_JL || t == IT_JLE || t == IT_JB || t == IT_JBE || t == IT_JP || t == IT_JO || t == IT_JS || t == IT_JNL || t == IT_JNLE || t == IT_JNB || t == IT_JNBE || t == IT_JNP || t == IT_JNO || t == IT_JNS || t == IT_LOOP || t == IT_LOOPZ || t == IT_LOOPNZ || t == IT_JCXZ
+	return t == IT_JE ||
+		t == IT_JNE ||
+		t == IT_JL ||
+		t == IT_JLE ||
+		t == IT_JB ||
+		t == IT_JBE ||
+		t == IT_JP ||
+		t == IT_JO ||
+		t == IT_JS ||
+		t == IT_JNL ||
+		t == IT_JNLE ||
+		t == IT_JNB ||
+		t == IT_JNBE ||
+		t == IT_JNP ||
+		t == IT_JNO ||
+		t == IT_JNS ||
+		t == IT_LOOP ||
+		t == IT_LOOPZ ||
+		t == IT_LOOPNZ ||
+		t == IT_JCXZ
 }
 
 func (t InstructionType) IsInOut() bool {
-	return t == IT_InFixed || t == IT_InVariable || t == IT_OutFixed || t == IT_OutVariable
+	return t == IT_InFixed ||
+		t == IT_InVariable ||
+		t == IT_OutFixed ||
+		t == IT_OutVariable
 }
 
 func (t InstructionType) AlwaysToRegister() bool {
-	return t == IT_ExchangeRegMemWithReg || t == IT_LoadEA || t == IT_LoadDS || t == IT_LoadES
+	return t == IT_ExchangeRegMemWithReg ||
+		t == IT_LoadEA ||
+		t == IT_LoadDS ||
+		t == IT_LoadES
 }
 
 func (t InstructionType) IsSingleByteInstruction() bool {
-	return t == IT_XLAT || t == IT_LoadAHWithFlags || t == IT_StoreAHWithFlags || t == IT_PushFlags || t == IT_PopFlags || t == IT_AsciiAdjustForAdd || t == IT_DecimalAdjustForAdd || t == IT_AsciiAdjustForSubtract || t == IT_DecimalAdjustForSubtract
+	return t == IT_XLAT ||
+		t == IT_LoadAHWithFlags ||
+		t == IT_StoreAHWithFlags ||
+		t == IT_PushFlags ||
+		t == IT_PopFlags ||
+		t == IT_AsciiAdjustForAdd ||
+		t == IT_DecimalAdjustForAdd ||
+		t == IT_AsciiAdjustForSubtract ||
+		t == IT_DecimalAdjustForSubtract ||
+		t == IT_ConvertByteToWord ||
+		t == IT_ConvertWordToDoubleWord
 }
 
 func (t InstructionType) IsSingleOperandInstruction() bool {
-	return t == IT_IncRegMem || t == IT_DecRegMem || t == IT_Neg || t == IT_Multiply || t == IT_MultiplySigned
+	return t == IT_IncRegMem ||
+		t == IT_DecRegMem ||
+		t == IT_Neg ||
+		t == IT_Multiply ||
+		t == IT_MultiplySigned ||
+		t == IT_Divide ||
+		t == IT_DivideSigned ||
+		t == IT_Not
 }
 
 func (a AddressCalculation) String() string {
@@ -782,6 +889,30 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_AsciiAdjustForMultiply, nil
 	}
 
+	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b110 {
+		return IT_Divide, nil
+	}
+
+	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b111 {
+		return IT_DivideSigned, nil
+	}
+
+	if b == 0b11010101 && content[1] == 0b00001010 {
+		return IT_AsciiAdjustForDivide, nil
+	}
+
+	if b == 0b10011000 {
+		return IT_ConvertByteToWord, nil
+	}
+
+	if b == 0b10011001 {
+		return IT_ConvertWordToDoubleWord, nil
+	}
+
+	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b010 {
+		return IT_Not, nil
+	}
+
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
 }
 
@@ -831,8 +962,9 @@ func assembleAndCompare(inputFileName string, inputFileContent []byte, result []
 	}
 
 	if len(assembled) != len(inputFileContent) {
-		return errors.New("length of assembled result does not match length of input")
+		return fmt.Errorf("length of assembled result (%d) does not match length of input (%d)", len(assembled), len(inputFileContent))
 	}
+
 	for i, b := range assembled {
 		if b != inputFileContent[i] {
 			return fmt.Errorf("byte does not match, expected %08b but got %08b", inputFileContent[i], b)
@@ -1300,7 +1432,8 @@ func disassemble(content []byte) (string, error) {
 			continue
 		}
 
-		if instructionType == IT_AsciiAdjustForMultiply {
+		if instructionType == IT_AsciiAdjustForMultiply || instructionType == IT_AsciiAdjustForDivide {
+			// TODO the manual says that these instructions are actually 4 bytes, but it works like this
 			instructions = append(instructions, Instruction{
 				Type: instructionType,
 			})
