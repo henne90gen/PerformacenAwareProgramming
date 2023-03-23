@@ -328,6 +328,10 @@ func (t InstructionType) Name() string {
 		return "imul"
 	}
 
+	if t == IT_AsciiAdjustForMultiply {
+		return "aam"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -772,6 +776,10 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b101 {
 		return IT_MultiplySigned, nil
+	}
+
+	if b == 0b11010100 && content[1] == 0b00001010 {
+		return IT_AsciiAdjustForMultiply, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -1289,6 +1297,13 @@ func disassemble(content []byte) (string, error) {
 				},
 			}
 			instructions = append(instructions, inst)
+			continue
+		}
+
+		if instructionType == IT_AsciiAdjustForMultiply {
+			instructions = append(instructions, Instruction{
+				Type: instructionType,
+			})
 			continue
 		}
 
