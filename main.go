@@ -118,7 +118,7 @@ const (
 	IT_ConvertWordToDoubleWord
 
 	IT_Not
-	IT_ShiftLeft
+	IT_ShiftLogicLeft
 	IT_ShiftLogicRight
 	IT_ShiftArithmeticRight
 	IT_RotateLeft
@@ -372,6 +372,34 @@ func (t InstructionType) Name() string {
 		return "not"
 	}
 
+	if t == IT_ShiftLogicLeft {
+		return "shl"
+	}
+
+	if t == IT_ShiftLogicRight {
+		return "shr"
+	}
+
+	if t == IT_ShiftArithmeticRight {
+		return "sar"
+	}
+
+	if t == IT_RotateLeft {
+		return "rol"
+	}
+
+	if t == IT_RotateRight {
+		return "ror"
+	}
+
+	if t == IT_RotateThroughCarryFlagLeft {
+		return "rcl"
+	}
+
+	if t == IT_RotateThroughCarryFlagRight {
+		return "rcr"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -477,7 +505,14 @@ func (t InstructionType) IsRegMemWithRegToEither() bool {
 		t == IT_MultiplySigned ||
 		t == IT_Divide ||
 		t == IT_DivideSigned ||
-		t == IT_Not
+		t == IT_Not ||
+		t == IT_ShiftLogicLeft ||
+		t == IT_ShiftLogicRight ||
+		t == IT_ShiftArithmeticRight ||
+		t == IT_RotateLeft ||
+		t == IT_RotateRight ||
+		t == IT_RotateThroughCarryFlagLeft ||
+		t == IT_RotateThroughCarryFlagRight
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -558,6 +593,16 @@ func (t InstructionType) IsSingleOperandInstruction() bool {
 		t == IT_Not
 }
 
+func (t InstructionType) IsShiftOrRotateInstruction() bool {
+	return t == IT_ShiftLogicLeft ||
+		t == IT_ShiftLogicRight ||
+		t == IT_ShiftArithmeticRight ||
+		t == IT_RotateLeft ||
+		t == IT_RotateRight ||
+		t == IT_RotateThroughCarryFlagLeft ||
+		t == IT_RotateThroughCarryFlagRight
+}
+
 func (a AddressCalculation) String() string {
 	switch a.Type {
 	case ACT_BX_SI:
@@ -617,6 +662,9 @@ func (d DataLocation) String() string {
 	case DL_Register:
 		return string(d.RegisterName)
 	case DL_Immediate:
+		if d.AvoidSizeInfo {
+			return strconv.Itoa(int(d.ImmediateValue))
+		}
 		result := ""
 		if !d.Wide {
 			result += "byte "
@@ -911,6 +959,34 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b010 {
 		return IT_Not, nil
+	}
+
+	if (b>>2) == 0b110100 && (content[1]>>3)&0b111 == 0b100 {
+		return IT_ShiftLogicLeft, nil
+	}
+
+	if (b>>2) == 0b110100 && (content[1]>>3)&0b111 == 0b101 {
+		return IT_ShiftLogicRight, nil
+	}
+
+	if (b>>2) == 0b110100 && (content[1]>>3)&0b111 == 0b111 {
+		return IT_ShiftArithmeticRight, nil
+	}
+
+	if (b>>2) == 0b110100 && (content[1]>>3)&0b111 == 0b000 {
+		return IT_RotateLeft, nil
+	}
+
+	if (b>>2) == 0b110100 && (content[1]>>3)&0b111 == 0b001 {
+		return IT_RotateRight, nil
+	}
+
+	if (b>>2) == 0b110100 && (content[1]>>3)&0b111 == 0b010 {
+		return IT_RotateThroughCarryFlagLeft, nil
+	}
+
+	if (b>>2) == 0b110100 && (content[1]>>3)&0b111 == 0b011 {
+		return IT_RotateThroughCarryFlagRight, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
@@ -1305,6 +1381,17 @@ func disassemble(content []byte) (string, error) {
 				if instructionType.IsSingleOperandInstruction() {
 					src = nil
 				}
+
+				if instructionType.IsShiftOrRotateInstruction() {
+					v := (b1 >> 1) & 0b1
+					if v == 0b0 {
+						src = &DataLocation{Type: DL_Immediate, ImmediateValue: 1, AvoidSizeInfo: true}
+					} else {
+						src = &DataLocation{Type: DL_Register, RegisterName: CL}
+					}
+					println("Hello")
+				}
+
 				inst := Instruction{
 					Type:        instructionType,
 					SizeInBytes: currentByte - startByte,
@@ -1346,23 +1433,35 @@ func disassemble(content []byte) (string, error) {
 			src := &DataLocation{}
 			dst := &DataLocation{}
 
-			d := (b1 >> 1) & 0b1
-			if d == 0b1 || instructionType.AlwaysToRegister() {
-				if instructionType == IT_LoadES {
-					w = 0b1
+			if instructionType.IsShiftOrRotateInstruction() {
+				v := (b1 >> 1) & 0b1
+				if v == 0b0 {
+					src = &DataLocation{Type: DL_Immediate, ImmediateValue: 1, AvoidSizeInfo: true}
+				} else {
+					src = &DataLocation{Type: DL_Register, RegisterName: CL}
 				}
-				dst.Type = DL_Register
-				dst.RegisterName = registerTable[w][reg]
-				src.Type = DL_Memory
-				src.AddressCalculation = addressCalculation
-				src.Wide = w == 0b1
-				src.AvoidSizeInfo = instructionType == IT_LoadDS || instructionType == IT_LoadES
-			} else {
-				src.Type = DL_Register
-				src.RegisterName = registerTable[w][reg]
 				dst.Type = DL_Memory
 				dst.AddressCalculation = addressCalculation
 				dst.Wide = w == 0b1
+			} else {
+				d := (b1 >> 1) & 0b1
+				if d == 0b1 || instructionType.AlwaysToRegister() {
+					if instructionType == IT_LoadES {
+						w = 0b1
+					}
+					dst.Type = DL_Register
+					dst.RegisterName = registerTable[w][reg]
+					src.Type = DL_Memory
+					src.AddressCalculation = addressCalculation
+					src.Wide = w == 0b1
+					src.AvoidSizeInfo = instructionType == IT_LoadDS || instructionType == IT_LoadES
+				} else {
+					src.Type = DL_Register
+					src.RegisterName = registerTable[w][reg]
+					dst.Type = DL_Memory
+					dst.AddressCalculation = addressCalculation
+					dst.Wide = w == 0b1
+				}
 			}
 
 			if instructionType.IsSingleOperandInstruction() {

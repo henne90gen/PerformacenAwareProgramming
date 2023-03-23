@@ -1,9 +1,14 @@
 bits 16
 
-shl ah, 1
-shr ax, 1
-sar bx, 1
-rol cx, 1
-ror dh, 1
-rcl sp, 1
-rcr bp, 1
+and al, ah
+and ch, cl
+and bp, si
+and di, sp
+and al, 93
+and ax, 20392
+and [bp + si + 10], ch
+and [bx + di + 1000], dx
+and bx, [bp]
+and cx, [4384]
+and byte [bp - 39], 239
+and word [bx + si - 4332], 10328
