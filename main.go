@@ -134,6 +134,10 @@ const (
 	IT_TestImAndRegMem
 	IT_TestImAndAcc
 
+	IT_OrRegMemWithRegToEither
+	IT_OrImToRegMem
+	IT_OrImToAcc
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -416,6 +420,10 @@ func (t InstructionType) Name() string {
 		return "test"
 	}
 
+	if t >= IT_OrRegMemWithRegToEither && t <= IT_OrImToAcc {
+		return "or"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -506,7 +514,8 @@ func (t InstructionType) IsImToAcc() bool {
 		t == IT_SubWithBorrowImFromAcc ||
 		t == IT_CmpImWithAcc ||
 		t == IT_AndImToAcc ||
-		t == IT_TestImAndAcc
+		t == IT_TestImAndAcc ||
+		t == IT_OrImToAcc
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
@@ -536,7 +545,8 @@ func (t InstructionType) IsRegMemWithRegToEither() bool {
 		t == IT_RotateThroughCarryFlagLeft ||
 		t == IT_RotateThroughCarryFlagRight ||
 		t == IT_AndRegMemWithRegToEither ||
-		t == IT_TestRegMemAndReg
+		t == IT_TestRegMemAndReg ||
+		t == IT_OrRegMemWithRegToEither
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -547,7 +557,8 @@ func (t InstructionType) IsImToRegMem() bool {
 		t == IT_SubWithBorrowImToRegMem ||
 		t == IT_CmpImWithRegMem ||
 		t == IT_AndImToRegMem ||
-		t == IT_TestImAndRegMem
+		t == IT_TestImAndRegMem ||
+		t == IT_OrImToRegMem
 }
 
 func (t InstructionType) HasSignExtension() bool {
@@ -931,7 +942,7 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_SubWithBorrowImFromAcc, nil
 	}
 
-	if (b >> 1) == 0b1111111 {
+	if (b>>1) == 0b1111111 && (content[1]>>3)&0b111 == 0b001 {
 		return IT_DecRegMem, nil
 	}
 
@@ -1019,7 +1030,7 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_AndRegMemWithRegToEither, nil
 	}
 
-	if (b >> 1) == 0b1000000 {
+	if (b>>1) == 0b1000000 && (content[1]>>3)&0b111 == 0b100 {
 		return IT_AndImToRegMem, nil
 	}
 
@@ -1031,12 +1042,24 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_TestRegMemAndReg, nil
 	}
 
-	if (b >> 1) == 0b1111011 {
+	if (b>>1) == 0b1111011 && (content[1]>>3)&0b111 == 0b000 {
 		return IT_TestImAndRegMem, nil
 	}
 
 	if (b >> 1) == 0b1010100 {
 		return IT_TestImAndAcc, nil
+	}
+
+	if (b >> 2) == 0b000010 {
+		return IT_OrRegMemWithRegToEither, nil
+	}
+
+	if (b>>1) == 0b1000000 && (content[1]>>3)&0b111 == 0b001 {
+		return IT_OrImToRegMem, nil
+	}
+
+	if (b >> 1) == 0b0000110 {
+		return IT_OrImToAcc, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
