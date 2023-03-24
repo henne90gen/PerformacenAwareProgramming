@@ -138,6 +138,10 @@ const (
 	IT_OrImToRegMem
 	IT_OrImToAcc
 
+	IT_XorRegMemWithRegToEither
+	IT_XorImToRegMem
+	IT_XorImToAcc
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -424,6 +428,10 @@ func (t InstructionType) Name() string {
 		return "or"
 	}
 
+	if t >= IT_XorRegMemWithRegToEither && t <= IT_XorImToAcc {
+		return "xor"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -515,7 +523,8 @@ func (t InstructionType) IsImToAcc() bool {
 		t == IT_CmpImWithAcc ||
 		t == IT_AndImToAcc ||
 		t == IT_TestImAndAcc ||
-		t == IT_OrImToAcc
+		t == IT_OrImToAcc ||
+		t == IT_XorImToAcc
 }
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
@@ -546,7 +555,8 @@ func (t InstructionType) IsRegMemWithRegToEither() bool {
 		t == IT_RotateThroughCarryFlagRight ||
 		t == IT_AndRegMemWithRegToEither ||
 		t == IT_TestRegMemAndReg ||
-		t == IT_OrRegMemWithRegToEither
+		t == IT_OrRegMemWithRegToEither ||
+		t == IT_XorRegMemWithRegToEither
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -558,7 +568,8 @@ func (t InstructionType) IsImToRegMem() bool {
 		t == IT_CmpImWithRegMem ||
 		t == IT_AndImToRegMem ||
 		t == IT_TestImAndRegMem ||
-		t == IT_OrImToRegMem
+		t == IT_OrImToRegMem ||
+		t == IT_XorImToRegMem
 }
 
 func (t InstructionType) HasSignExtension() bool {
@@ -1060,6 +1071,18 @@ func getInstructionType(content []byte) (InstructionType, error) {
 
 	if (b >> 1) == 0b0000110 {
 		return IT_OrImToAcc, nil
+	}
+
+	if (b >> 2) == 0b001100 {
+		return IT_XorRegMemWithRegToEither, nil
+	}
+
+	if (b>>1) == 0b1000000 && (content[1]>>3)&0b111 == 0b110 {
+		return IT_XorImToRegMem, nil
+	}
+
+	if (b >> 1) == 0b0011010 {
+		return IT_XorImToAcc, nil
 	}
 
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
