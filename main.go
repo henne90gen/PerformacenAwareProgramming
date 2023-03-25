@@ -154,6 +154,12 @@ const (
 	IT_CallDirectIntersegment
 	IT_CallIndirectIntersegment
 
+	IT_JumpDirectWithinSegment
+	IT_JumpDirectWithinSegmentShort
+	IT_JumpIndirectWithinSegment
+	IT_JumpDirectIntersegment
+	IT_JumpIndirectIntersegment
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -471,6 +477,10 @@ func (t InstructionType) Name() string {
 
 	if t >= IT_CallDirectWithinSegment && t <= IT_CallIndirectIntersegment {
 		return "call"
+	}
+
+	if t >= IT_JumpDirectWithinSegment && t <= IT_JumpIndirectIntersegment {
+		return "jmp"
 	}
 
 	if t == IT_JE {
@@ -1184,11 +1194,31 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_CallDirectIntersegment, nil
 	}
 
-	if b == 0b1111111 && (content[1]>>3)&0b111 == 0b011 {
+	if b == 0b11111111 && (content[1]>>3)&0b111 == 0b011 {
 		return IT_CallIndirectIntersegment, nil
 	}
 
-	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
+	if b == 0b11101001 {
+		return IT_JumpDirectWithinSegment, nil
+	}
+
+	if b == 0b11101011 {
+		return IT_JumpDirectWithinSegmentShort, nil
+	}
+
+	if b == 0b11111111 && (content[1]>>3)&0b111 == 0b100 {
+		return IT_JumpIndirectWithinSegment, nil
+	}
+
+	if b == 0b11101010 {
+		return IT_JumpDirectIntersegment, nil
+	}
+
+	if b == 0b11111111 && (content[1]>>3)&0b111 == 0b101 {
+		return IT_JumpIndirectIntersegment, nil
+	}
+
+	return IT_Invalid, fmt.Errorf("opcode %08b %08b not implemented yet", b, content[1])
 }
 
 func assembleAndCompare(inputFileName string, inputFileContent []byte, result []byte) error {
