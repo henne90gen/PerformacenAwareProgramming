@@ -142,6 +142,13 @@ const (
 	IT_XorImToRegMem
 	IT_XorImToAcc
 
+	IT_Repeat
+	IT_MoveByte
+	IT_CompareByte
+	IT_ScanByte
+	IT_LoadByte
+	IT_StoreByte
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -224,6 +231,7 @@ var registerTable = [][]RegisterName{
 type Instruction struct {
 	Type        InstructionType
 	SizeInBytes int
+	Wide        bool
 	Destination *DataLocation
 	Source      *DataLocation
 }
@@ -432,6 +440,30 @@ func (t InstructionType) Name() string {
 		return "xor"
 	}
 
+	if t == IT_Repeat {
+		return "rep"
+	}
+
+	if t == IT_MoveByte {
+		return "movs"
+	}
+
+	if t == IT_CompareByte {
+		return "cmps"
+	}
+
+	if t == IT_ScanByte {
+		return "scas"
+	}
+
+	if t == IT_LoadByte {
+		return "lods"
+	}
+
+	if t == IT_StoreByte {
+		return "stds"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -627,7 +659,17 @@ func (t InstructionType) IsSingleByteInstruction() bool {
 		t == IT_AsciiAdjustForSubtract ||
 		t == IT_DecimalAdjustForSubtract ||
 		t == IT_ConvertByteToWord ||
-		t == IT_ConvertWordToDoubleWord
+		t == IT_ConvertWordToDoubleWord ||
+		t == IT_Repeat ||
+		t.IsStringManipulationInstruction()
+}
+
+func (t InstructionType) IsStringManipulationInstruction() bool {
+	return t == IT_MoveByte ||
+		t == IT_CompareByte ||
+		t == IT_ScanByte ||
+		t == IT_LoadByte ||
+		t == IT_StoreByte
 }
 
 func (t InstructionType) IsSingleOperandInstruction() bool {
@@ -741,7 +783,15 @@ func (d DataLocation) String() string {
 func (i Instruction) String() string {
 	if i.Source == nil {
 		if i.Destination == nil {
-			return fmt.Sprintf("%s\n", i.Type.Name())
+			wide := ""
+			if i.Type.IsStringManipulationInstruction() {
+				if i.Wide {
+					wide = "w"
+				} else {
+					wide = "b"
+				}
+			}
+			return fmt.Sprintf("%s%s\n", i.Type.Name(), wide)
 		}
 
 		return fmt.Sprintf("%s %s\n", i.Type.Name(), i.Destination.String())
@@ -1085,6 +1135,30 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_XorImToAcc, nil
 	}
 
+	if (b >> 1) == 0b1111001 {
+		return IT_Repeat, nil
+	}
+
+	if (b >> 1) == 0b1010010 {
+		return IT_MoveByte, nil
+	}
+
+	if (b >> 1) == 0b1010011 {
+		return IT_CompareByte, nil
+	}
+
+	if (b >> 1) == 0b1010111 {
+		return IT_ScanByte, nil
+	}
+
+	if (b >> 1) == 0b1010110 {
+		return IT_LoadByte, nil
+	}
+
+	if (b >> 1) == 0b1010101 {
+		return IT_StoreByte, nil
+	}
+
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
 }
 
@@ -1285,6 +1359,7 @@ func disassemble(content []byte) (string, error) {
 		}
 
 		if instructionType.IsSingleByteInstruction() {
+			// TODO parse w if IsStringManipulation()
 			instructions = append(instructions, Instruction{
 				Type:        instructionType,
 				SizeInBytes: 1,
