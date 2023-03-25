@@ -1,18 +1,6 @@
 bits 16
 
-rep
-movsb
-rep
-cmpsb
-rep
-scasb
-rep
-lodsb
-rep
-movsw
-rep
-cmpsw
-rep
-scasw
-rep
-lodsw
+jmp ax
+jmp di
+jmp [12]
+jmp [4395]

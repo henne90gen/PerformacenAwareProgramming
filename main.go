@@ -149,6 +149,11 @@ const (
 	IT_LoadByte
 	IT_StoreByte
 
+	IT_CallDirectWithinSegment
+	IT_CallIndirectWithinSegment
+	IT_CallDirectIntersegment
+	IT_CallIndirectIntersegment
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -461,7 +466,11 @@ func (t InstructionType) Name() string {
 	}
 
 	if t == IT_StoreByte {
-		return "stds"
+		return "stos"
+	}
+
+	if t >= IT_CallDirectWithinSegment && t <= IT_CallIndirectIntersegment {
+		return "call"
 	}
 
 	if t == IT_JE {
@@ -588,7 +597,9 @@ func (t InstructionType) IsRegMemWithRegToEither() bool {
 		t == IT_AndRegMemWithRegToEither ||
 		t == IT_TestRegMemAndReg ||
 		t == IT_OrRegMemWithRegToEither ||
-		t == IT_XorRegMemWithRegToEither
+		t == IT_XorRegMemWithRegToEither ||
+		t == IT_CallIndirectWithinSegment ||
+		t == IT_CallIndirectIntersegment
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -680,7 +691,9 @@ func (t InstructionType) IsSingleOperandInstruction() bool {
 		t == IT_MultiplySigned ||
 		t == IT_Divide ||
 		t == IT_DivideSigned ||
-		t == IT_Not
+		t == IT_Not ||
+		t == IT_CallIndirectWithinSegment ||
+		t == IT_CallIndirectIntersegment
 }
 
 func (t InstructionType) IsShiftOrRotateInstruction() bool {
@@ -1159,6 +1172,22 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_StoreByte, nil
 	}
 
+	if b == 0b11101000 {
+		return IT_CallDirectWithinSegment, nil
+	}
+
+	if b == 0b11111111 && (content[1]>>3)&0b111 == 0b010 {
+		return IT_CallIndirectWithinSegment, nil
+	}
+
+	if b == 0b10011010 {
+		return IT_CallDirectIntersegment, nil
+	}
+
+	if b == 0b1111111 && (content[1]>>3)&0b111 == 0b011 {
+		return IT_CallIndirectIntersegment, nil
+	}
+
 	return IT_Invalid, fmt.Errorf("opcode %08b not implemented yet", b)
 }
 
@@ -1359,10 +1388,11 @@ func disassemble(content []byte) (string, error) {
 		}
 
 		if instructionType.IsSingleByteInstruction() {
-			// TODO parse w if IsStringManipulation()
+			w := b1 & 0b1
 			instructions = append(instructions, Instruction{
 				Type:        instructionType,
 				SizeInBytes: 1,
+				Wide:        w == 0b1,
 			})
 			continue
 		}
