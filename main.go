@@ -609,7 +609,8 @@ func (t InstructionType) IsRegMemWithRegToEither() bool {
 		t == IT_OrRegMemWithRegToEither ||
 		t == IT_XorRegMemWithRegToEither ||
 		t == IT_CallIndirectWithinSegment ||
-		t == IT_CallIndirectIntersegment
+		t == IT_CallIndirectIntersegment ||
+		t == IT_JumpIndirectWithinSegment
 }
 
 func (t InstructionType) IsImToRegMem() bool {
@@ -632,7 +633,7 @@ func (t InstructionType) HasSignExtension() bool {
 		t == IT_CmpImWithRegMem
 }
 
-func (t InstructionType) IsJump() bool {
+func (t InstructionType) IsConditionalJump() bool {
 	return t == IT_JE ||
 		t == IT_JNE ||
 		t == IT_JL ||
@@ -703,7 +704,11 @@ func (t InstructionType) IsSingleOperandInstruction() bool {
 		t == IT_DivideSigned ||
 		t == IT_Not ||
 		t == IT_CallIndirectWithinSegment ||
-		t == IT_CallIndirectIntersegment
+		t == IT_CallIndirectIntersegment ||
+		t == IT_JumpDirectWithinSegment ||
+		t == IT_JumpIndirectWithinSegment ||
+		t == IT_JumpDirectIntersegment ||
+		t == IT_JumpIndirectIntersegment
 }
 
 func (t InstructionType) IsShiftOrRotateInstruction() bool {
@@ -1427,7 +1432,7 @@ func disassemble(content []byte) (string, error) {
 			continue
 		}
 
-		if instructionType.IsJump() {
+		if instructionType.IsConditionalJump() {
 			offset := int8(content[currentByte])
 			currentByte++
 
