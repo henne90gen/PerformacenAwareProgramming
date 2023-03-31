@@ -160,6 +160,11 @@ const (
 	IT_JumpDirectIntersegment
 	IT_JumpIndirectIntersegment
 
+	IT_ReturnWithinSegment
+	IT_ReturnWithinSegmentAddingImmediateToSP
+	IT_ReturnIntersegment
+	IT_ReturnIntersegmentAddingImmediateToSP
+
 	IT_JE
 	IT_JNE
 	IT_JL
@@ -180,6 +185,11 @@ const (
 	IT_LOOPZ
 	IT_LOOPNZ
 	IT_JCXZ
+
+	IT_InterruptTypeSpecified
+	IT_InterruptType3
+	IT_InterruptOnOverflow
+	IT_InterruptReturn
 )
 
 type AddressCalculationType int
@@ -483,6 +493,10 @@ func (t InstructionType) Name() string {
 		return "jmp"
 	}
 
+	if t >= IT_ReturnWithinSegment && t <= IT_ReturnIntersegmentAddingImmediateToSP {
+		return "ret"
+	}
+
 	if t == IT_JE {
 		return "je"
 	}
@@ -561,6 +575,22 @@ func (t InstructionType) Name() string {
 
 	if t == IT_JCXZ {
 		return "jcxz"
+	}
+
+	if t == IT_InterruptTypeSpecified {
+		return "int"
+	}
+
+	if t == IT_InterruptType3 {
+		return "int3"
+	}
+
+	if t == IT_InterruptOnOverflow {
+		return "into"
+	}
+
+	if t == IT_InterruptReturn {
+		return "iret"
 	}
 
 	return ""
@@ -683,7 +713,12 @@ func (t InstructionType) IsSingleByteInstruction() bool {
 		t == IT_ConvertByteToWord ||
 		t == IT_ConvertWordToDoubleWord ||
 		t == IT_Repeat ||
-		t.IsStringManipulationInstruction()
+		t.IsStringManipulationInstruction() ||
+		t == IT_ReturnWithinSegment ||
+		t == IT_ReturnIntersegment ||
+		t == IT_InterruptType3 ||
+		t == IT_InterruptOnOverflow ||
+		t == IT_InterruptReturn
 }
 
 func (t InstructionType) IsStringManipulationInstruction() bool {
@@ -1223,6 +1258,38 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_JumpIndirectIntersegment, nil
 	}
 
+	if b == 0b11000011 {
+		return IT_ReturnWithinSegment, nil
+	}
+
+	if b == 0b11000010 {
+		return IT_ReturnWithinSegmentAddingImmediateToSP, nil
+	}
+
+	if b == 0b11001011 {
+		return IT_ReturnIntersegment, nil
+	}
+
+	if b == 0b11001010 {
+		return IT_ReturnIntersegmentAddingImmediateToSP, nil
+	}
+
+	if b == 0b11001101 {
+		return IT_InterruptTypeSpecified, nil
+	}
+
+	if b == 0b11001100 {
+		return IT_InterruptType3, nil
+	}
+
+	if b == 0b11001110 {
+		return IT_InterruptOnOverflow, nil
+	}
+
+	if b == 0b11001111 {
+		return IT_InterruptReturn, nil
+	}
+
 	return IT_Invalid, fmt.Errorf("opcode %08b %08b not implemented yet", b, content[1])
 }
 
@@ -1285,10 +1352,9 @@ func assembleAndCompare(inputFileName string, inputFileContent []byte, result []
 }
 
 func Parse16BitValue(content []byte) int16 {
-	tmp := content[0]
-
+	lowByte := int16(content[0])
 	highByte := int16(content[1])
-	return int16(tmp) | (highByte << 8)
+	return (highByte << 8) | lowByte
 }
 
 func ParseData(content []byte, wide bool) (int, int16) {
@@ -1298,7 +1364,7 @@ func ParseData(content []byte, wide bool) (int, int16) {
 		data = int16(int8(content[0]))
 		parsedBytes = 1
 	} else {
-		data = Parse16BitValue(content[0:])
+		data = Parse16BitValue(content)
 		parsedBytes = 2
 	}
 	return parsedBytes, data
@@ -1447,6 +1513,34 @@ func disassemble(content []byte) (string, error) {
 			}
 			instructions = append(instructions, instruction)
 			labels = insertLabel(labels, labelPosition)
+			continue
+		}
+
+		if instructionType == IT_ReturnWithinSegmentAddingImmediateToSP || instructionType == IT_ReturnIntersegmentAddingImmediateToSP {
+			parsedBytes, data := ParseData(content[currentByte:], true)
+			currentByte += int(parsedBytes)
+			instructions = append(instructions, Instruction{
+				Type: instructionType,
+				Destination: &DataLocation{
+					Type:           DL_Immediate,
+					ImmediateValue: data,
+					AvoidSizeInfo:  true,
+				},
+			})
+			continue
+		}
+
+		if instructionType == IT_InterruptTypeSpecified {
+			parsedBytes, data := ParseData(content[currentByte:], false)
+			currentByte += int(parsedBytes)
+			instructions = append(instructions, Instruction{
+				Type: instructionType,
+				Destination: &DataLocation{
+					Type:           DL_Immediate,
+					ImmediateValue: data,
+					AvoidSizeInfo:  true,
+				},
+			})
 			continue
 		}
 

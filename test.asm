@@ -1,5 +1,7 @@
 bits 16
 
-ret -7
-ret 500
-ret
+int 13
+int3
+    
+into
+iret
