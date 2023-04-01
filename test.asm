@@ -1,7 +1,4 @@
 bits 16
 
-int 13
-int3
-    
-into
-iret
+lock not byte [bp + 9905]
+lock xchg [100], al

@@ -190,6 +190,19 @@ const (
 	IT_InterruptType3
 	IT_InterruptOnOverflow
 	IT_InterruptReturn
+
+	IT_ClearCarry
+	IT_ComplementCarry
+	IT_SetCarry
+	IT_ClearDirection
+	IT_SetDirection
+	IT_ClearInterrupt
+	IT_SetInterrupt
+	IT_Halt
+	IT_Wait
+	IT_Escape
+	IT_BusLockPrefix
+	// IT_OverridePrefix
 )
 
 type AddressCalculationType int
@@ -593,6 +606,54 @@ func (t InstructionType) Name() string {
 		return "iret"
 	}
 
+	if t == IT_ClearCarry {
+		return "clc"
+	}
+
+	if t == IT_ComplementCarry {
+		return "cmc"
+	}
+
+	if t == IT_SetCarry {
+		return "stc"
+	}
+
+	if t == IT_ClearDirection {
+		return "cld"
+	}
+
+	if t == IT_SetDirection {
+		return "std"
+	}
+
+	if t == IT_ClearInterrupt {
+		return "cli"
+	}
+
+	if t == IT_SetInterrupt {
+		return "sti"
+	}
+
+	if t == IT_Halt {
+		return "hlt"
+	}
+
+	if t == IT_Wait {
+		return "wait"
+	}
+
+	if t == IT_Escape {
+		return "esc"
+	}
+
+	if t == IT_BusLockPrefix {
+		return "lock"
+	}
+
+	// if t == IT_OverridePrefix {
+	// 	return "segment"
+	// }
+
 	return ""
 }
 
@@ -718,7 +779,17 @@ func (t InstructionType) IsSingleByteInstruction() bool {
 		t == IT_ReturnIntersegment ||
 		t == IT_InterruptType3 ||
 		t == IT_InterruptOnOverflow ||
-		t == IT_InterruptReturn
+		t == IT_InterruptReturn ||
+		t == IT_ClearCarry ||
+		t == IT_ComplementCarry ||
+		t == IT_SetCarry ||
+		t == IT_ClearDirection ||
+		t == IT_SetDirection ||
+		t == IT_ClearInterrupt ||
+		t == IT_SetInterrupt ||
+		t == IT_Halt ||
+		t == IT_Wait ||
+		t == IT_BusLockPrefix
 }
 
 func (t InstructionType) IsStringManipulationInstruction() bool {
@@ -1290,6 +1361,54 @@ func getInstructionType(content []byte) (InstructionType, error) {
 		return IT_InterruptReturn, nil
 	}
 
+	if b == 0b11111000 {
+		return IT_ClearCarry, nil
+	}
+
+	if b == 0b11110101 {
+		return IT_ComplementCarry, nil
+	}
+
+	if b == 0b11111001 {
+		return IT_SetCarry, nil
+	}
+
+	if b == 0b11111100 {
+		return IT_ClearDirection, nil
+	}
+
+	if b == 0b11111101 {
+		return IT_SetDirection, nil
+	}
+
+	if b == 0b11111010 {
+		return IT_ClearInterrupt, nil
+	}
+
+	if b == 0b11111011 {
+		return IT_SetInterrupt, nil
+	}
+
+	if b == 0b11110100 {
+		return IT_Halt, nil
+	}
+
+	if b == 0b10011011 {
+		return IT_Wait, nil
+	}
+
+	if b>>3 == 0b11011 {
+		return IT_Escape, nil
+	}
+
+	if b == 0b11110000 {
+		return IT_BusLockPrefix, nil
+	}
+
+	// if b&0b11100111 == 0b00100110 {
+	// 	return IT_OverridePrefix, nil
+	// }
+
 	return IT_Invalid, fmt.Errorf("opcode %08b %08b not implemented yet", b, content[1])
 }
 
@@ -1344,7 +1463,7 @@ func assembleAndCompare(inputFileName string, inputFileContent []byte, result []
 
 	for i, b := range assembled {
 		if b != inputFileContent[i] {
-			return fmt.Errorf("byte does not match, expected %08b but got %08b", inputFileContent[i], b)
+			return fmt.Errorf("[%s] byte %d does not match, expected %08b but got %08b", inputFileName, i, inputFileContent[i], b)
 		}
 	}
 
@@ -1520,7 +1639,8 @@ func disassemble(content []byte) (string, error) {
 			parsedBytes, data := ParseData(content[currentByte:], true)
 			currentByte += int(parsedBytes)
 			instructions = append(instructions, Instruction{
-				Type: instructionType,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
 				Destination: &DataLocation{
 					Type:           DL_Immediate,
 					ImmediateValue: data,
@@ -1534,7 +1654,8 @@ func disassemble(content []byte) (string, error) {
 			parsedBytes, data := ParseData(content[currentByte:], false)
 			currentByte += int(parsedBytes)
 			instructions = append(instructions, Instruction{
-				Type: instructionType,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
 				Destination: &DataLocation{
 					Type:           DL_Immediate,
 					ImmediateValue: data,
@@ -1719,7 +1840,6 @@ func disassemble(content []byte) (string, error) {
 					} else {
 						src = &DataLocation{Type: DL_Register, RegisterName: CL}
 					}
-					println("Hello")
 				}
 
 				inst := Instruction{
@@ -1864,7 +1984,8 @@ func disassemble(content []byte) (string, error) {
 		if instructionType == IT_AsciiAdjustForMultiply || instructionType == IT_AsciiAdjustForDivide {
 			// TODO the manual says that these instructions are actually 4 bytes, but it works like this
 			instructions = append(instructions, Instruction{
-				Type: instructionType,
+				Type:        instructionType,
+				SizeInBytes: currentByte - startByte,
 			})
 			continue
 		}
