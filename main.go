@@ -202,7 +202,16 @@ const (
 	IT_Wait
 	IT_Escape
 	IT_BusLockPrefix
-	// IT_OverridePrefix
+)
+
+type SegmentOverridePrefix int
+
+const (
+	SOP_Invalid = iota
+	SOP_ES
+	SOP_CS
+	SOP_SS
+	SOP_DS
 )
 
 type AddressCalculationType int
@@ -914,6 +923,22 @@ func (d DataLocation) String() string {
 	panic("unknown data location")
 }
 
+func (sop SegmentOverridePrefix) String() string {
+	switch sop {
+	case SOP_ES:
+		return "es"
+	case SOP_CS:
+		return "cs"
+	case SOP_SS:
+		return "ss"
+	case SOP_DS:
+		return "ds"
+	case SOP_Invalid:
+		panic("trying to stringify an invalid segment override prefix")
+	}
+	return ""
+}
+
 func (i Instruction) String() string {
 	if i.Source == nil {
 		if i.Destination == nil {
@@ -931,7 +956,12 @@ func (i Instruction) String() string {
 		return fmt.Sprintf("%s %s\n", i.Type.Name(), i.Destination.String())
 	}
 
-	return fmt.Sprintf("%s %s, %s\n", i.Type.Name(), i.Destination.String(), i.Source.String())
+	return fmt.Sprintf(
+		"%s %s, %s\n",
+		i.Type.Name(),
+		i.Destination.String(),
+		i.Source.String(),
+	)
 }
 
 func getInstructionType(content []byte) (InstructionType, error) {
