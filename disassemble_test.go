@@ -108,6 +108,8 @@ func TestDisassemble(t *testing.T) {
 		"computer_enhance/perfaware/part1/listing_0041_add_sub_cmp_jnz.asm",
 		// TODO "computer_enhance/perfaware/part1/listing_0042_completionist_decode.asm",
 		"computer_enhance/perfaware/part1/listing_0043_immediate_movs.asm",
+		"computer_enhance/perfaware/part1/listing_0044_register_movs.asm",
+		"computer_enhance/perfaware/part1/listing_0045_challenge_register_movs.asm",
 	}
 	for _, inputFile := range inputFiles {
 		t.Run(inputFile, func(t *testing.T) {

@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 type Context struct {
-	Registers [16]byte
+	Registers [24]byte
 	Memory    [1024 * 1024]byte
 }
 
@@ -59,6 +59,18 @@ func getPositionAndWide(registerName RegisterName) (int, bool) {
 	case DI:
 		position = 14
 		wide = true
+	case CS:
+		position = 16
+		wide = true
+	case DS:
+		position = 18
+		wide = true
+	case ES:
+		position = 20
+		wide = true
+	case SS:
+		position = 22
+		wide = true
 	default:
 		panic(fmt.Sprintf("unknown register name: %s", registerName))
 	}
@@ -92,6 +104,15 @@ func Simulate(context *Context, instructions []Instruction) error {
 		switch instruction.Type {
 		case IT_MovImToReg:
 			context.SetRegister(instruction.Destination.RegisterName, instruction.Source.ImmediateValue)
+		case IT_MovRegMemToFromReg:
+			fallthrough
+		case IT_MovSegRegToRegMem:
+			fallthrough
+		case IT_MovRegMemToSegReg:
+			if instruction.Destination.Type == DL_Register && instruction.Source.Type == DL_Register {
+				value := context.GetRegister(instruction.Source.RegisterName)
+				context.SetRegister(instruction.Destination.RegisterName, value)
+			}
 		default:
 			return fmt.Errorf("instruction simulation not implemented for %s", instruction.Type.Name())
 		}

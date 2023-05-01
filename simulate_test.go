@@ -61,6 +61,8 @@ func requireContextsToBeEqual(t *testing.T, expected *Context, actual *Context) 
 func TestSimulation(t *testing.T) {
 	inputFiles := []string{
 		"computer_enhance/perfaware/part1/listing_0043_immediate_movs.asm",
+		"computer_enhance/perfaware/part1/listing_0044_register_movs.asm",
+		"computer_enhance/perfaware/part1/listing_0045_challenge_register_movs.asm",
 	}
 	for _, inputFile := range inputFiles {
 		t.Run(inputFile, func(t *testing.T) {

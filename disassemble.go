@@ -325,6 +325,14 @@ func Disassemble(content []byte) ([]Instruction, error) {
 				if instructionType.IsSingleOperandInstruction() {
 					src = nil
 				}
+				if instructionType == IT_MovRegMemToSegReg {
+					src.RegisterName = registerTable[1][rm]
+					dst.RegisterName = segmentRegisterTable[reg]
+				}
+				if instructionType == IT_MovSegRegToRegMem {
+					src.RegisterName = segmentRegisterTable[reg]
+					dst.RegisterName = registerTable[1][rm]
+				}
 
 				if instructionType.IsShiftOrRotateInstruction() {
 					v := (b1 >> 1) & 0b1

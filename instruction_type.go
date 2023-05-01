@@ -171,7 +171,7 @@ const (
 )
 
 func (t InstructionType) Name() string {
-	if t > IT_Invalid && t < IT_MovSegRegToRegMem {
+	if t > IT_Invalid && t <= IT_MovSegRegToRegMem {
 		return "mov"
 	}
 
@@ -531,7 +531,7 @@ func (t InstructionType) Name() string {
 		return "lock"
 	}
 
-	return ""
+	return "unknown"
 }
 
 func (t InstructionType) IsImToAcc() bool {
@@ -548,6 +548,8 @@ func (t InstructionType) IsImToAcc() bool {
 
 func (t InstructionType) IsRegMemWithRegToEither() bool {
 	return t == IT_MovRegMemToFromReg ||
+		t == IT_MovSegRegToRegMem ||
+		t == IT_MovRegMemToSegReg ||
 		t == IT_AddRegMemWithRegToEither ||
 		t == IT_AddWithCarryRegMemWithRegToEither ||
 		t == IT_IncRegMem ||
@@ -1174,10 +1176,6 @@ func InstructionTypeFromBytes(content []byte) (InstructionType, error) {
 	if b == 0b11110000 {
 		return IT_BusLockPrefix, nil
 	}
-
-	// if b&0b11100111 == 0b00100110 {
-	// 	return IT_OverridePrefix, nil
-	// }
 
 	return IT_Invalid, fmt.Errorf("opcode %08b %08b not implemented yet", b, content[1])
 }
