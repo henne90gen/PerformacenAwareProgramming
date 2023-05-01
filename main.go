@@ -567,54 +567,31 @@ func disassemble(content []byte) (Result, error) {
 	return Result{Instructions: instructions, Labels: labels}, nil
 }
 
-func main() {
-	inputFiles := []string{
-		"test.asm",
-		"computer_enhance/perfaware/part1/listing_0037_single_register_mov.asm",
-		"computer_enhance/perfaware/part1/listing_0038_many_register_mov.asm",
-		"computer_enhance/perfaware/part1/listing_0039_more_movs.asm",
-		"computer_enhance/perfaware/part1/listing_0040_challenge_movs.asm",
-		"computer_enhance/perfaware/part1/listing_0041_add_sub_cmp_jnz.asm",
+func assembleWithNasm(inputFile string) ([]byte, error) {
+	cmd := exec.Command("nasm", inputFile)
+	stdout := new(strings.Builder)
+	stderr := new(strings.Builder)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	err := cmd.Run()
+	if err != nil {
+		println(stdout.String())
+		println(stderr.String())
+		return nil, err
 	}
-	for _, inputFile := range inputFiles {
-		cmd := exec.Command("nasm", inputFile)
-		stdout := new(strings.Builder)
-		stderr := new(strings.Builder)
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
-		err := cmd.Run()
-		if err != nil {
-			println(stdout.String())
-			println(stderr.String())
-			panic(err)
-		}
 
-		assembledInputFile := strings.TrimSuffix(inputFile, ".asm")
-		content, err := os.ReadFile(assembledInputFile)
-		if err != nil {
-			panic(err)
-		}
-
-		if !strings.HasPrefix(inputFile, "computer_enhance") {
-			err = os.Remove(assembledInputFile)
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		result, err := disassemble(content)
-		if err != nil {
-			stringifiedInstructions := stringifyResult(result)
-			print(stringifiedInstructions)
-			panic(err)
-		}
-
-		stringifiedInstructions := stringifyResult(result)
-		err = assembleAndCompare(inputFile, content, []byte(stringifiedInstructions))
-		if err != nil {
-			panic(err)
-		}
-
-		println("Success - " + inputFile)
+	assembledInputFile := strings.TrimSuffix(inputFile, ".asm")
+	content, err := os.ReadFile(assembledInputFile)
+	if err != nil {
+		return nil, err
 	}
+
+	if !strings.HasPrefix(inputFile, "computer_enhance") {
+		err = os.Remove(assembledInputFile)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return content, nil
 }
