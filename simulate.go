@@ -87,7 +87,7 @@ func (c *Context) GetRegister(registerName RegisterName) int16 {
 	return value
 }
 
-func simulate(context *Context, instructions []Instruction) error {
+func Simulate(context *Context, instructions []Instruction) error {
 	for _, instruction := range instructions {
 		switch instruction.Type {
 		case IT_MovImToReg:
