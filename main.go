@@ -9,11 +9,6 @@ import (
 	"strings"
 )
 
-type Result struct {
-	Instructions []Instruction
-	Labels       []Label
-}
-
 func assembleAndCompare(inputFileName string, inputFileContent []byte, result []byte) error {
 	dir, fileName := filepath.Split(inputFileName)
 	tmpFile, err := os.CreateTemp(dir, fileName+"-*.asm")
@@ -112,31 +107,23 @@ func ParseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCal
 	}
 }
 
-func stringifyResult(instructions Result) string {
+func stringifyInstructions(instructions []Instruction) string {
 	result := "bits 16\n"
-	currentByte := 0
-	currentLabel := 0
-	for _, instruction := range instructions.Instructions {
+	for _, instruction := range instructions {
 		result += instruction.String()
-		currentByte += instruction.SizeInBytes
-		if len(instructions.Labels) > currentLabel && currentByte+1 > instructions.Labels[currentLabel].PositionInBytes {
-			result += fmt.Sprintf("label_%d:\n", instructions.Labels[currentLabel].PositionInBytes)
-			currentLabel++
-		}
 	}
 	return result
 }
 
-func disassemble(content []byte) (Result, error) {
+func disassemble(content []byte) ([]Instruction, error) {
 	instructions := make([]Instruction, 0)
-	labels := make([]Label, 0)
 	currentByte := 0
 	for currentByte < len(content) {
 		startByte := currentByte
 
 		instructionType, err := InstructionTypeFromBytes(content[currentByte:])
 		if err != nil {
-			return Result{Instructions: instructions, Labels: labels}, err
+			return instructions, err
 		}
 
 		b1 := content[currentByte]
@@ -192,17 +179,15 @@ func disassemble(content []byte) (Result, error) {
 			offset := int8(content[currentByte])
 			currentByte++
 
-			labelPosition := currentByte + int(offset)
 			instruction := Instruction{
 				Type:        instructionType,
 				SizeInBytes: currentByte - startByte,
 				Destination: &DataLocation{
 					Type:          DL_Label,
-					LabelPosition: labelPosition,
+					LabelPosition: int(offset + 2),
 				},
 			}
 			instructions = append(instructions, instruction)
-			labels = insertLabel(labels, labelPosition)
 			continue
 		}
 
@@ -561,10 +546,10 @@ func disassemble(content []byte) (Result, error) {
 			continue
 		}
 
-		return Result{Instructions: instructions, Labels: labels}, errors.New("instruction decode not implemented yet")
+		return instructions, errors.New("instruction decode not implemented yet")
 	}
 
-	return Result{Instructions: instructions, Labels: labels}, nil
+	return instructions, nil
 }
 
 func assembleWithNasm(inputFile string) ([]byte, error) {

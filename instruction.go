@@ -192,7 +192,7 @@ func (d DataLocation) String() string {
 		}
 		return result + d.AddressCalculation.String()
 	case DL_Label:
-		return fmt.Sprintf("label_%d", d.LabelPosition)
+		return fmt.Sprintf("$%+d", d.LabelPosition)
 	}
 
 	panic("unknown data location")

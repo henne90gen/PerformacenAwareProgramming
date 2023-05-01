@@ -22,12 +22,12 @@ func TestDecode(t *testing.T) {
 			content, err := assembleWithNasm(inputFile)
 			require.NoError(t, err)
 
-			result, err := disassemble(content)
-			require.NoError(t, err)
+			instructions, err := disassemble(content)
+			stringifiedInstructions := stringifyInstructions(instructions)
+			require.NoError(t, err, stringifiedInstructions)
 
-			stringifiedInstructions := stringifyResult(result)
 			err = assembleAndCompare(inputFile, content, []byte(stringifiedInstructions))
-			require.NoError(t, err)
+			require.NoError(t, err, stringifiedInstructions)
 		})
 	}
 }
@@ -41,10 +41,10 @@ func TestSimulation(t *testing.T) {
 			content, err := assembleWithNasm(inputFile)
 			require.NoError(t, err)
 
-			result, err := disassemble(content)
+			instructions, err := disassemble(content)
 			require.NoError(t, err)
 
-			require.Len(t, result.Instructions, 8)
+			require.Len(t, instructions, 8)
 		})
 	}
 }
