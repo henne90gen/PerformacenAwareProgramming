@@ -2,91 +2,28 @@ package main
 
 import (
 	"errors"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 )
 
-func assembleAndCompare(inputFileName string, inputFileContent []byte, result []byte) error {
-	dir, fileName := filepath.Split(inputFileName)
-	tmpFile, err := os.CreateTemp(dir, fileName+"-*.asm")
-	if err != nil {
-		return err
-	}
-
-	_, err = tmpFile.Write(result)
-	if err != nil {
-		return err
-	}
-
-	err = tmpFile.Close()
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("nasm", tmpFile.Name())
-	stdout := new(strings.Builder)
-	stderr := new(strings.Builder)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	err = cmd.Run()
-	if err != nil {
-		println(stdout.String())
-		println(stderr.String())
-		return err
-	}
-
-	err = os.Remove(tmpFile.Name())
-	if err != nil {
-		return err
-	}
-
-	trimmedTmpFile := strings.TrimSuffix(tmpFile.Name(), ".asm")
-	assembled, err := os.ReadFile(trimmedTmpFile)
-	if err != nil {
-		return err
-	}
-
-	err = os.Remove(trimmedTmpFile)
-	if err != nil {
-		return err
-	}
-
-	if len(assembled) != len(inputFileContent) {
-		return fmt.Errorf("length of assembled result (%d) does not match length of input (%d)", len(assembled), len(inputFileContent))
-	}
-
-	for i, b := range assembled {
-		if b != inputFileContent[i] {
-			return fmt.Errorf("[%s] byte %d does not match, expected %08b but got %08b", inputFileName, i, inputFileContent[i], b)
-		}
-	}
-
-	return nil
-}
-
-func Parse16BitValue(content []byte) int16 {
+func parse16BitValue(content []byte) int16 {
 	lowByte := int16(content[0])
 	highByte := int16(content[1])
 	return (highByte << 8) | lowByte
 }
 
-func ParseData(content []byte, wide bool) (int, int16) {
+func parseData(content []byte, wide bool) (int, int16) {
 	parsedBytes := 0
 	data := int16(0)
 	if !wide {
 		data = int16(int8(content[0]))
 		parsedBytes = 1
 	} else {
-		data = Parse16BitValue(content)
+		data = parse16BitValue(content)
 		parsedBytes = 2
 	}
 	return parsedBytes, data
 }
 
-func ParseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCalculation) {
+func parseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCalculation) {
 	currentByte := 0
 	addressCalculationType := addressCalculationTable[mod][rm]
 
@@ -97,7 +34,7 @@ func ParseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCal
 		currentByte++
 	} else if mod == 0b10 || (mod == 0b00 && rm == 0b110) {
 		// Memory Mode, 16 bit displacement follows
-		displacement = Parse16BitValue(content[currentByte:])
+		displacement = parse16BitValue(content[currentByte:])
 		currentByte += 2
 	}
 
@@ -107,7 +44,7 @@ func ParseAddressCalculation(content []byte, mod byte, rm byte) (int, AddressCal
 	}
 }
 
-func stringifyInstructions(instructions []Instruction) string {
+func StringifyInstructions(instructions []Instruction) string {
 	result := "bits 16\n"
 	for _, instruction := range instructions {
 		result += instruction.String()
@@ -115,7 +52,7 @@ func stringifyInstructions(instructions []Instruction) string {
 	return result
 }
 
-func disassemble(content []byte) ([]Instruction, error) {
+func Disassemble(content []byte) ([]Instruction, error) {
 	instructions := make([]Instruction, 0)
 	currentByte := 0
 	for currentByte < len(content) {
@@ -192,7 +129,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 		}
 
 		if instructionType == IT_ReturnWithinSegmentAddingImmediateToSP || instructionType == IT_ReturnIntersegmentAddingImmediateToSP {
-			parsedBytes, data := ParseData(content[currentByte:], true)
+			parsedBytes, data := parseData(content[currentByte:], true)
 			currentByte += int(parsedBytes)
 			instructions = append(instructions, Instruction{
 				Type:        instructionType,
@@ -207,7 +144,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 		}
 
 		if instructionType == IT_InterruptTypeSpecified {
-			parsedBytes, data := ParseData(content[currentByte:], false)
+			parsedBytes, data := parseData(content[currentByte:], false)
 			currentByte += int(parsedBytes)
 			instructions = append(instructions, Instruction{
 				Type:        instructionType,
@@ -225,7 +162,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 			w := (b1 >> 3) & 0b00000001
 			reg := b1 & 0b00000111
 
-			parsedBytes, data := ParseData(content[currentByte:], w == 0b1)
+			parsedBytes, data := parseData(content[currentByte:], w == 0b1)
 			currentByte += parsedBytes
 
 			src := DataLocation{
@@ -257,7 +194,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 					RegisterName: DX,
 				}
 			} else {
-				parsedBytes, data := ParseData(content[currentByte:], false)
+				parsedBytes, data := parseData(content[currentByte:], false)
 				currentByte += parsedBytes
 				src = DataLocation{
 					Type:           DL_Immediate,
@@ -288,7 +225,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 		}
 
 		if instructionType == IT_MovMemToAcc {
-			displacement := Parse16BitValue(content[currentByte:])
+			displacement := parse16BitValue(content[currentByte:])
 			currentByte += 2
 
 			src := DataLocation{
@@ -314,7 +251,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 		}
 
 		if instructionType == IT_MovAccToMem {
-			displacement := Parse16BitValue(content[currentByte:])
+			displacement := parse16BitValue(content[currentByte:])
 			currentByte += 2
 
 			src := DataLocation{
@@ -340,7 +277,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 		}
 
 		if instructionType.IsImToAcc() {
-			parsedBytes, data := ParseData(content[currentByte:], w == 0b1)
+			parsedBytes, data := parseData(content[currentByte:], w == 0b1)
 			currentByte += parsedBytes
 
 			src := DataLocation{
@@ -410,7 +347,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 
 			s := (b1 >> 1) & 0b1
 			wide := s == 0b0 && w == 0b1
-			parsedBytes, data := ParseData(content[currentByte:], wide)
+			parsedBytes, data := parseData(content[currentByte:], wide)
 			currentByte += parsedBytes
 
 			src := DataLocation{
@@ -432,7 +369,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 			continue
 		}
 
-		parsedBytes, addressCalculation := ParseAddressCalculation(content[currentByte:], mod, rm)
+		parsedBytes, addressCalculation := parseAddressCalculation(content[currentByte:], mod, rm)
 		currentByte += parsedBytes
 
 		if instructionType.IsRegMemWithRegToEither() {
@@ -491,7 +428,7 @@ func disassemble(content []byte) ([]Instruction, error) {
 				s := (b1 >> 1) & 0b1
 				wide = wide && s == 0b0
 			}
-			parsedBytes, data := ParseData(content[currentByte:], wide)
+			parsedBytes, data := parseData(content[currentByte:], wide)
 			currentByte += parsedBytes
 			src := DataLocation{
 				Type:           DL_Immediate,
@@ -550,33 +487,4 @@ func disassemble(content []byte) ([]Instruction, error) {
 	}
 
 	return instructions, nil
-}
-
-func assembleWithNasm(inputFile string) ([]byte, error) {
-	cmd := exec.Command("nasm", inputFile)
-	stdout := new(strings.Builder)
-	stderr := new(strings.Builder)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	err := cmd.Run()
-	if err != nil {
-		println(stdout.String())
-		println(stderr.String())
-		return nil, err
-	}
-
-	assembledInputFile := strings.TrimSuffix(inputFile, ".asm")
-	content, err := os.ReadFile(assembledInputFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if !strings.HasPrefix(inputFile, "computer_enhance") {
-		err = os.Remove(assembledInputFile)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return content, nil
 }
