@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -10,7 +10,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func parseFlags(context *Context, flags string) {
+	if strings.Contains(flags, "Z") {
+		context.SetFlag(Flag_Zero, true)
+	}
+	if strings.Contains(flags, "S") {
+		context.SetFlag(Flag_Sign, true)
+	}
+	if strings.Contains(flags, "P") {
+		context.SetFlag(Flag_Parity, true)
+	}
+
+	// if strings.Contains(flags, "O") {
+	// 	context.SetFlag(Flag_Overflow, true)
+	// }
+	// if strings.Contains(flags, "C") {
+	// 	context.SetFlag(Flag_Carry, true)
+	// }
+	// if strings.Contains(flags, "A") {
+	// 	context.SetFlag(Flag_AuxilliaryCarry, true)
+	// }
+}
+
 func createExpectedContext(inputFile string) (*Context, error) {
+	// TODO parse state changes after every instruction as well
+
 	outputFile := strings.TrimSuffix(inputFile, ".asm") + ".txt"
 	expectedOutput, err := os.ReadFile(outputFile)
 	if err != nil {
@@ -36,12 +60,17 @@ func createExpectedContext(inputFile string) (*Context, error) {
 		}
 
 		parts := strings.Split(line, " ")
-		if len(parts) != 3 {
-			return nil, errors.New("unexpected line in 'expected state'")
+		if len(parts) > 3 {
+			return nil, fmt.Errorf("unexpected line in 'expected state': %s", line)
 		}
 
 		registerName := strings.TrimRight(parts[0], ":")
-		value, err := strconv.ParseInt(parts[1], 0, 16)
+		if registerName == "flags" {
+			parseFlags(context, parts[1])
+			continue
+		}
+
+		value, err := strconv.ParseInt(parts[1], 0, 17)
 		if err != nil {
 			return nil, err
 		}
@@ -56,6 +85,9 @@ func requireContextsToBeEqual(t *testing.T, expected *Context, actual *Context) 
 	for i := range expected.Registers {
 		require.Equalf(t, expected.Registers[i], actual.Registers[i], "mismatch in register state at position %d", i)
 	}
+	for i := range expected.Flags {
+		require.Equalf(t, expected.Flags[i], actual.Flags[i], "mismatch in flag at position %d", i)
+	}
 }
 
 func TestSimulation(t *testing.T) {
@@ -63,6 +95,7 @@ func TestSimulation(t *testing.T) {
 		"computer_enhance/perfaware/part1/listing_0043_immediate_movs.asm",
 		"computer_enhance/perfaware/part1/listing_0044_register_movs.asm",
 		"computer_enhance/perfaware/part1/listing_0045_challenge_register_movs.asm",
+		"computer_enhance/perfaware/part1/listing_0046_add_sub_cmp.asm",
 	}
 	for _, inputFile := range inputFiles {
 		t.Run(inputFile, func(t *testing.T) {
