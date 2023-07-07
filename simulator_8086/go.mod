@@ -1,4 +1,4 @@
-module computer-enhance
+module simulator_8086
 
 go 1.20
 

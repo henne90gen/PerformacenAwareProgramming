@@ -1,0 +1,6 @@
+go 1.20
+
+use (
+    haversine_point_generator
+    simulator_8086
+)
