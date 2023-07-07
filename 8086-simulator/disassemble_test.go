@@ -1,4 +1,4 @@
-package main
+package simulator8086
 
 import (
 	"fmt"
@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+const COMPUTER_ENHANCE_PATH = "../computer_enhance"
 
 func assembleWithNasm(inputFile string) ([]byte, error) {
 	cmd := exec.Command("nasm", inputFile)
@@ -30,7 +32,7 @@ func assembleWithNasm(inputFile string) ([]byte, error) {
 		return nil, err
 	}
 
-	if !strings.HasPrefix(inputFile, "computer_enhance") {
+	if !strings.HasPrefix(inputFile, COMPUTER_ENHANCE_PATH) {
 		err = os.Remove(assembledInputFile)
 		if err != nil {
 			return nil, err
@@ -101,15 +103,15 @@ func assembleAndCompare(inputFileName string, inputFileContent []byte, result []
 func TestDisassemble(t *testing.T) {
 	inputFiles := []string{
 		"test.asm",
-		"computer_enhance/perfaware/part1/listing_0037_single_register_mov.asm",
-		"computer_enhance/perfaware/part1/listing_0038_many_register_mov.asm",
-		"computer_enhance/perfaware/part1/listing_0039_more_movs.asm",
-		"computer_enhance/perfaware/part1/listing_0040_challenge_movs.asm",
-		"computer_enhance/perfaware/part1/listing_0041_add_sub_cmp_jnz.asm",
+		COMPUTER_ENHANCE_PATH + "/perfaware/part1/listing_0037_single_register_mov.asm",
+		COMPUTER_ENHANCE_PATH + "/perfaware/part1/listing_0038_many_register_mov.asm",
+		COMPUTER_ENHANCE_PATH + "/perfaware/part1/listing_0039_more_movs.asm",
+		COMPUTER_ENHANCE_PATH + "/perfaware/part1/listing_0040_challenge_movs.asm",
+		COMPUTER_ENHANCE_PATH + "/perfaware/part1/listing_0041_add_sub_cmp_jnz.asm",
 		// TODO "computer_enhance/perfaware/part1/listing_0042_completionist_decode.asm",
-		"computer_enhance/perfaware/part1/listing_0043_immediate_movs.asm",
-		"computer_enhance/perfaware/part1/listing_0044_register_movs.asm",
-		"computer_enhance/perfaware/part1/listing_0045_challenge_register_movs.asm",
+		COMPUTER_ENHANCE_PATH + "/perfaware/part1/listing_0043_immediate_movs.asm",
+		COMPUTER_ENHANCE_PATH + "/perfaware/part1/listing_0044_register_movs.asm",
+		COMPUTER_ENHANCE_PATH + "/perfaware/part1/listing_0045_challenge_register_movs.asm",
 	}
 	for _, inputFile := range inputFiles {
 		t.Run(inputFile, func(t *testing.T) {

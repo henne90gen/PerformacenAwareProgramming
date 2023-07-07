@@ -1,4 +1,4 @@
-package main
+package simulator8086
 
 import "fmt"
 
@@ -12,6 +12,25 @@ const (
 	Flag_Parity
 	Flag_Overflow
 )
+
+func (f FlagIndex) Name() string {
+	switch f {
+	case Flag_Zero:
+		return "Flag_Zero"
+	case Flag_Sign:
+		return "Flag_Sign"
+	case Flag_Carry:
+		return "Flag_Carry"
+	case Flag_AuxilliaryCarry:
+		return "Flag_AuxilliaryCarry"
+	case Flag_Parity:
+		return "Flag_Parity"
+	case Flag_Overflow:
+		return "Flag_Overflow"
+	}
+
+	return "invalid FlagIndex"
+}
 
 type Context struct {
 	Registers          [24]byte
@@ -171,6 +190,7 @@ func (c *Context) SetValue(destination *DataLocation, value int16, updateFlags b
 	if parity%2 == 0 {
 		c.SetFlag(Flag_Parity, true)
 	}
+	fmt.Printf("%d %8b %d\n", value, value, parity)
 
 	if value < 0 {
 		c.SetFlag(Flag_Sign, true)

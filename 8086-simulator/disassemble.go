@@ -1,4 +1,4 @@
-package main
+package simulator8086
 
 import (
 	"errors"
