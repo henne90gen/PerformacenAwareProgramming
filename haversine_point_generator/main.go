@@ -126,6 +126,9 @@ func GeneratePointPairs(numPointPairs int, seed int64) []PointPair {
 
 func Main(ctx *cli.Context) error {
 	numPointPairs := ctx.Int("total")
+	if numPointPairs == 0 {
+		numPointPairs = 1000
+	}
 	seed := ctx.Int64("seed")
 	if seed == 0 {
 		seed = time.Now().UnixNano()
