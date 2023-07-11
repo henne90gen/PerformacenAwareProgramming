@@ -22,7 +22,7 @@ type PointPair struct {
 }
 
 type Result struct {
-	Pairs []PointPair
+	Pairs []PointPair `json:"pairs"`
 }
 
 func Square(A float64) float64 {
@@ -133,6 +133,7 @@ func Main(ctx *cli.Context) error {
 	if seed == 0 {
 		seed = time.Now().UnixNano()
 	}
+	outFilePath := ctx.String("out")
 
 	var result Result
 	result.Pairs = GeneratePointPairs(numPointPairs, seed)
@@ -142,8 +143,12 @@ func Main(ctx *cli.Context) error {
 		return fmt.Errorf("failed to marshal json: %s", err)
 	}
 
-	fmt.Printf("%s", buf)
-	return nil
+	if outFilePath == "" {
+		fmt.Printf("%s", buf)
+		return nil
+	}
+
+	return os.WriteFile(outFilePath, buf, os.ModePerm)
 }
 
 func main() {
@@ -154,6 +159,9 @@ func main() {
 			},
 			&cli.Int64Flag{
 				Name: "seed",
+			},
+			&cli.StringFlag{
+				Name: "out",
 			},
 		},
 		DefaultCommand: "default",
