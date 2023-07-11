@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include "shared.h"
+#include "reference.h"
 
 static f64 Square(f64 A)
 {
@@ -32,7 +32,7 @@ f64 ReferenceHaversine(f64 X0, f64 Y0, f64 X1, f64 Y1, f64 EarthRadius)
     lat1 = RadiansFromDegrees(lat1);
     lat2 = RadiansFromDegrees(lat2);
 
-    f64 a = Square(sin(dLat / 2.0)) + cos(lat1) * cos(lat2) * Square(sin(dLon / 2));
+    f64 a = Square(sin(dLat / 2.0)) + cos(lat1) * cos(lat2) * Square(sin(dLon / 2.0));
     f64 c = 2.0 * asin(sqrt(a));
 
     f64 Result = EarthRadius * c;

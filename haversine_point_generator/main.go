@@ -51,7 +51,7 @@ func Haversine(X0, Y0, X1, Y1, EarthRadius float64) float64 {
 	lat1 = RadiansFromDegrees(lat1)
 	lat2 = RadiansFromDegrees(lat2)
 
-	a := Square(math.Sin(dLat/2.0)) + math.Cos(lat1)*math.Cos(lat2)*Square(math.Sin(dLon/2))
+	a := Square(math.Sin(dLat/2.0)) + math.Cos(lat1)*math.Cos(lat2)*Square(math.Sin(dLon/2.0))
 	c := 2.0 * math.Asin(math.Sqrt(a))
 
 	return EarthRadius * c
@@ -93,7 +93,7 @@ func RandomYCoordinateWithinCluster(random *rand.Rand, cluster Cluster) float64 
 	return cluster.Y + f*cluster.DY
 }
 
-func GeneratePointPairs(numPointPairs int, seed int64) []PointPair {
+func GeneratePointPairs(numPointPairs int, seed int64) ([]PointPair, []float64) {
 	randomSource := rand.NewSource(seed)
 	random := rand.New(randomSource)
 
@@ -101,6 +101,7 @@ func GeneratePointPairs(numPointPairs int, seed int64) []PointPair {
 	clusters := GenerateClusters(random, numClusters)
 
 	result := make([]PointPair, numPointPairs)
+	distances := make([]float64, numPointPairs)
 	distanceSum := 0.0
 	for i := 0; i < numPointPairs; i++ {
 		clusterIndex := i % numClusters
@@ -115,13 +116,12 @@ func GeneratePointPairs(numPointPairs int, seed int64) []PointPair {
 			Y1: y1,
 		}
 		distance := Haversine(x0, y0, x1, y1, 6372.8)
+		fmt.Printf("%f, %f, %f, %f = %f\n", x0, y0, x1, y1, distance)
+		distances[i] = distance
 		distanceSum += distance
 	}
 
-	distanceAvg := distanceSum / float64(numPointPairs)
-	os.Stderr.WriteString(fmt.Sprintf("Average distance: %f\n", distanceAvg))
-
-	return result
+	return result, distances
 }
 
 func Main(ctx *cli.Context) error {
@@ -134,13 +134,20 @@ func Main(ctx *cli.Context) error {
 		seed = time.Now().UnixNano()
 	}
 	outFilePath := ctx.String("out")
+	answersFilePath := ctx.String("answers")
+
+	pointPairs, distances := GeneratePointPairs(numPointPairs, seed)
 
 	var result Result
-	result.Pairs = GeneratePointPairs(numPointPairs, seed)
+	result.Pairs = pointPairs
 
 	buf, err := json.Marshal(&result)
 	if err != nil {
 		return fmt.Errorf("failed to marshal json: %s", err)
+	}
+
+	if len(answersFilePath) != 0 {
+		writeAnswers(answersFilePath, pointPairs, distances)
 	}
 
 	if outFilePath == "" {
@@ -149,6 +156,19 @@ func Main(ctx *cli.Context) error {
 	}
 
 	return os.WriteFile(outFilePath, buf, os.ModePerm)
+}
+
+func writeAnswers(answersFilePath string, pointPairs []PointPair, distances []float64) {
+	answers := ""
+	for i, distance := range distances {
+		p := pointPairs[i]
+		answers += fmt.Sprintf("%f %f %f %f %f\n", p.X0, p.Y0, p.X1, p.Y1, distance)
+	}
+
+	err := os.WriteFile(answersFilePath, []byte(answers), os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
@@ -162,6 +182,9 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name: "out",
+			},
+			&cli.StringFlag{
+				Name: "answers",
 			},
 		},
 		DefaultCommand: "default",

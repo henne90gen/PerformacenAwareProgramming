@@ -1,3 +1,3 @@
-typedef double f64;
+#pragma once
 
-f64 ReferenceHaversine(f64 X0, f64 Y0, f64 X1, f64 Y1, f64 EarthRadius);
+typedef double f64;
