@@ -1,22 +1,26 @@
 #include "haversine.h"
 
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 
-std::vector<f64>
+std::pair<std::vector<f64>, std::vector<PointPair>>
 parseAnswers() {
     std::vector<f64> answers = {};
+    std::vector<PointPair> pointPairs = {};
     auto f = std::ifstream("../answers.txt");
-    if (!f.is_open()) {
-        std::cerr << "failed to open answers file" << std::endl;
-        return {};
+    double a, b, c, d, e;
+    while (f >> a >> b >> c >> d >> e) {
+        answers.push_back(e);
+        pointPairs.push_back({ a, b, c, d });
     }
-    double a;
-    while (f >> a) {
-        answers.push_back(a);
-    }
-    return answers;
+    return { answers, pointPairs };
+}
+
+bool
+approximatelyEqual(f64 a, f64 b, f64 epsilon) {
+    return std::fabs(a - b) <= ((std::fabs(a) < std::fabs(b) ? std::fabs(b) : std::fabs(a)) * epsilon);
 }
 
 int
@@ -33,30 +37,28 @@ main() {
 
     auto distances = CalculateHaversineDistances(pointPairs);
 
-    auto answers = parseAnswers();
+    auto [answers, answerPointPairs] = parseAnswers();
     if (answers.empty()) {
         return 1;
     }
-    auto itr = answers.begin() + (answers.size() - 1);
-    auto expectedDistanceAverage = *itr;
 
-    std::cout << "// GIVEN" << std::endl
-              << "std::vector<PointPair> pointPairs = {" << std::endl;
-    for (const auto &pair: pointPairs) {
-        std::cout << "{" << pair.x0 << ", " << pair.y0 << ", " << pair.x1 << ", " << pair.y1 << "}," << std::endl;
-    }
-    std::cout << "};" << std::endl
-              << std::endl
-              << "// WHEN" << std::endl
-              << "const auto result = CalculateHaversineDistances(pointPairs);" << std::endl
-              << std::endl
-              << "// THEN" << std::endl
-              << "EXPECT_EQ(result.size(), " << distances.size() << ");" << std::endl;
-
+    auto epsilon = 0.00000001;
+    auto expectedDistanceAverage = 0.0;
+    auto distanceAverage = 0.0;
     for (int i = 0; i < distances.size(); i++) {
         const auto &distance = distances[i];
         const auto &expectedDistance = answers[i];
-        std::cout << "EXPECT_FLOAT_EQ(result[" << i << "], " << expectedDistance << ");" << std::endl;
+        if (!approximatelyEqual(distance, expectedDistance, epsilon)) {
+            std::cout << "failed " << distance << " != " << expectedDistance << std::endl;
+        }
+        distanceAverage += distance;
+        expectedDistanceAverage += expectedDistance;
+    }
+
+    distanceAverage /= static_cast<f64>(distances.size());
+    expectedDistanceAverage /= static_cast<f64>(distances.size());
+    if (!approximatelyEqual(distanceAverage, expectedDistanceAverage, epsilon)) {
+        std::cout << "average failed " << distanceAverage << " != " << expectedDistanceAverage << std::endl;
     }
 
     return 0;
