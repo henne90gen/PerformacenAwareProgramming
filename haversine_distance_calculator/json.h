@@ -6,57 +6,59 @@
 
 #include "shared.h"
 
-enum class JSON_NodeType {
-    DICTIONARY = 0,
-    ARRAY = 1,
-    STRING = 2,
-    INTEGER = 3,
-    FLOAT = 4,
-    BOOLEAN = 5,
-};
+namespace JSON {
+    enum class NodeType {
+        DICTIONARY = 0,
+        ARRAY = 1,
+        STRING = 2,
+        INTEGER = 3,
+        FLOAT = 4,
+        BOOLEAN = 5,
+    };
 
-struct JSON_Node {
-    JSON_NodeType type;
+    struct Node {
+        NodeType type;
 
-    explicit JSON_Node(JSON_NodeType t) : type(t) {}
-};
+        explicit Node(NodeType t) : type(t) {}
+    };
 
-struct JSON_Dictionary : public JSON_Node {
-    std::unordered_map<std::string, JSON_Node *> dictionary;
+    struct Dictionary : public Node {
+        std::unordered_map<std::string, Node *> dictionary;
 
-    explicit JSON_Dictionary(std::unordered_map<std::string, JSON_Node *> d) : JSON_Node(JSON_NodeType::DICTIONARY), dictionary(d) {}
-    ~JSON_Dictionary();
-};
+        explicit Dictionary(std::unordered_map<std::string, Node *> d) : Node(NodeType::DICTIONARY), dictionary(d) {}
+        ~Dictionary();
+    };
 
-struct JSON_Array : public JSON_Node {
-    std::vector<JSON_Node *> array;
+    struct Array : public Node {
+        std::vector<Node *> array;
 
-    explicit JSON_Array(std::vector<JSON_Node *> a) : JSON_Node(JSON_NodeType::ARRAY), array(a) {}
-    ~JSON_Array();
-};
+        explicit Array(std::vector<Node *> a) : Node(NodeType::ARRAY), array(a) {}
+        ~Array();
+    };
 
-struct JSON_String : public JSON_Node {
-    std::string s;
+    struct String : public Node {
+        std::string s;
 
-    explicit JSON_String(std::string s) : JSON_Node(JSON_NodeType::STRING), s(s) {}
-};
+        explicit String(std::string s) : Node(NodeType::STRING), s(s) {}
+    };
 
-struct JSON_Integer : public JSON_Node {
-    int64_t i;
+    struct Integer : public Node {
+        int64_t i;
 
-    explicit JSON_Integer(int64_t i) : JSON_Node(JSON_NodeType::INTEGER), i(i) {}
-};
+        explicit Integer(int64_t i) : Node(NodeType::INTEGER), i(i) {}
+    };
 
-struct JSON_Float : public JSON_Node {
-    f64 f;
+    struct Float : public Node {
+        f64 f;
 
-    explicit JSON_Float(f64 f) : JSON_Node(JSON_NodeType::FLOAT), f(f) {}
-};
+        explicit Float(f64 f) : Node(NodeType::FLOAT), f(f) {}
+    };
 
-struct JSON_Bool : public JSON_Node {
-    bool b;
+    struct Bool : public Node {
+        bool b;
 
-    explicit JSON_Bool(bool b) : JSON_Node(JSON_NodeType::BOOLEAN), b(b) {}
-};
+        explicit Bool(bool b) : Node(NodeType::BOOLEAN), b(b) {}
+    };
 
-JSON_Node *parseJSON(char *buf, int length);
+    Node *Parse(char *buf, int length);
+}
