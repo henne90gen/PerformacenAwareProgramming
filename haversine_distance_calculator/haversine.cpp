@@ -3,15 +3,17 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "haversine.h"
+#include "json.h"
 #include "reference.h"
 
 const f64 EARTHS_RADIUS = 6372.8;
 
 std::vector<PointPair>
-ParsePointPairs(const std::string &path) {
+ParsePointPairsCustom(const std::string &path) {
     auto f = std::ifstream(path, std::ios::binary | std::ios::ate);
     if (!f.is_open()) {
         std::cerr << "failed to open '" << path << "'" << std::endl;
@@ -99,6 +101,86 @@ ParsePointPairs(const std::string &path) {
 
     result.emplace_back(currentPair[0], currentPair[1], currentPair[2], currentPair[3]);
 
+    return result;
+}
+
+std::vector<PointPair>
+ParsePointPairsGeneric(const std::string &path) {
+    auto f = std::ifstream(path, std::ios::binary | std::ios::ate);
+    if (!f.is_open()) {
+        std::cerr << "failed to open '" << path << "'" << std::endl;
+        return {};
+    }
+
+    const auto fileSize = f.tellg();
+    f.seekg(0, std::ios::beg);
+
+    auto buf = (char *) malloc(fileSize);
+    if (!f.read(buf, fileSize)) {
+        std::cerr << "failed to read data" << std::endl;
+        return {};
+    }
+
+    auto root = parseJSON(buf, fileSize);
+    if (root == nullptr) {
+        return {};
+    }
+
+    if (root->type != JSON_NodeType::DICTIONARY) {
+        delete root;
+        return {};
+    }
+
+    auto dict = (JSON_Dictionary *) root;
+    auto itr = dict->dictionary.find("pairs");
+    if (itr == dict->dictionary.end()) {
+        delete root;
+        return {};
+    }
+
+    auto node = itr->second;
+    if (node->type != JSON_NodeType::ARRAY) {
+        delete root;
+        return {};
+    }
+
+    std::vector<PointPair> result = {};
+    auto arr = (JSON_Array *) node;
+    for (auto n: arr->array) {
+        if (n->type != JSON_NodeType::DICTIONARY) {
+            delete root;
+            return {};
+        }
+
+        auto d = (JSON_Dictionary *) n;
+        auto itrX0 = d->dictionary.find("x0");
+        if (itrX0 == d->dictionary.end() || itrX0->second->type != JSON_NodeType::FLOAT) {
+            delete root;
+            return {};
+        }
+
+        auto itrY0 = d->dictionary.find("y0");
+        if (itrY0 == d->dictionary.end() || itrY0->second->type != JSON_NodeType::FLOAT) {
+            delete root;
+            return {};
+        }
+
+        auto itrX1 = d->dictionary.find("x1");
+        if (itrX1 == d->dictionary.end() || itrX1->second->type != JSON_NodeType::FLOAT) {
+            delete root;
+            return {};
+        }
+
+        auto itrY1 = d->dictionary.find("y1");
+        if (itrY1 == d->dictionary.end() || itrY1->second->type != JSON_NodeType::FLOAT) {
+            delete root;
+            return {};
+        }
+
+        result.emplace_back(((JSON_Float *) itrX0->second)->f, ((JSON_Float *) itrY0->second)->f, ((JSON_Float *) itrX1->second)->f, ((JSON_Float *) itrY1->second)->f);
+    }
+
+    delete root;
     return result;
 }
 

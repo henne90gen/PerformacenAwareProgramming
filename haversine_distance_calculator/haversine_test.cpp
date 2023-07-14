@@ -9,7 +9,7 @@ std::pair<std::vector<f64>, std::vector<PointPair>>
 parseAnswers() {
     std::vector<f64> answers = {};
     std::vector<PointPair> pointPairs = {};
-    auto f = std::ifstream("../../answers.txt");
+    auto f = std::ifstream("../answers.txt");
     double a, b, c, d, e;
     while (f >> a >> b >> c >> d >> e) {
         answers.push_back(e);
@@ -19,7 +19,7 @@ parseAnswers() {
 }
 
 TEST(HaversineTest, testWithPointParsing) {
-    auto pointPairs = ParsePointPairs("../../point_pairs.json");
+    auto pointPairs = ParsePointPairsCustom("../point_pairs.json");
 
     auto result = parseAnswers();
     auto answers = result.first;
@@ -33,8 +33,24 @@ TEST(HaversineTest, testWithPointParsing) {
     }
 }
 
-TEST(HaversineTest, testJustPointParsing) {
-    auto pointPairs = ParsePointPairs("../../point_pairs.json");
+TEST(HaversineTest, testJustPointParsingCustom) {
+    auto pointPairs = ParsePointPairsCustom("../point_pairs.json");
+
+    auto result = parseAnswers();
+    auto expectedPointPairs = result.second;
+
+    for (int i = 0; i < pointPairs.size(); i++) {
+        const auto &pointPair = pointPairs[i];
+        const auto &expectedPointPair = expectedPointPairs[i];
+        ASSERT_FLOAT_EQ(pointPair.x0, expectedPointPair.x0);
+        ASSERT_FLOAT_EQ(pointPair.y0, expectedPointPair.y0);
+        ASSERT_FLOAT_EQ(pointPair.x1, expectedPointPair.x1);
+        ASSERT_FLOAT_EQ(pointPair.y1, expectedPointPair.y1);
+    }
+}
+
+TEST(HaversineTest, testJustPointParsingGeneric) {
+    auto pointPairs = ParsePointPairsGeneric("../point_pairs.json");
 
     auto result = parseAnswers();
     auto expectedPointPairs = result.second;

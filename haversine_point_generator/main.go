@@ -162,7 +162,7 @@ func writeAnswers(answersFilePath string, pointPairs []PointPair, distances []fl
 	answers := ""
 	for i, distance := range distances {
 		p := pointPairs[i]
-		answers += fmt.Sprintf("%f %f %f %f %f\n", p.X0, p.Y0, p.X1, p.Y1, distance)
+		answers += fmt.Sprintf("%.15f %.15f %.15f %.15f %.15f\n", p.X0, p.Y0, p.X1, p.Y1, distance)
 	}
 
 	err := os.WriteFile(answersFilePath, []byte(answers), os.ModePerm)

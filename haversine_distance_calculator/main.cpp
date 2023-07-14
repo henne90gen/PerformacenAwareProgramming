@@ -7,7 +7,11 @@
 std::vector<f64>
 parseAnswers() {
     std::vector<f64> answers = {};
-    auto f = std::ifstream("../../answers.txt");
+    auto f = std::ifstream("../answers.txt");
+    if (!f.is_open()) {
+        std::cerr << "failed to open answers file" << std::endl;
+        return {};
+    }
     double a;
     while (f >> a) {
         answers.push_back(a);
@@ -15,18 +19,24 @@ parseAnswers() {
     return answers;
 }
 
-
 int
 main() {
     std::cout << std::fixed << std::setw(18) << std::setprecision(18);
 
-    auto pointPairs = ParsePointPairs("../../point_pairs.json");
+    auto pointPairs = ParsePointPairsGeneric("../point_pairs.json");
 
     std::cout << "parsed " << pointPairs.size() << " pairs" << std::endl;
+
+    if (pointPairs.empty()) {
+        return 1;
+    }
 
     auto distances = CalculateHaversineDistances(pointPairs);
 
     auto answers = parseAnswers();
+    if (answers.empty()) {
+        return 1;
+    }
     auto itr = answers.begin() + (answers.size() - 1);
     auto expectedDistanceAverage = *itr;
 

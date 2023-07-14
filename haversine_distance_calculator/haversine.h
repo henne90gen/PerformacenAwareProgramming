@@ -12,6 +12,8 @@ struct PointPair {
 };
 
 std::vector<PointPair>
-ParsePointPairs(const std::string &path);
+ParsePointPairsCustom(const std::string &path);
+std::vector<PointPair>
+ParsePointPairsGeneric(const std::string &path);
 
 std::vector<f64> CalculateHaversineDistances(const std::vector<PointPair> &pointPairs);
