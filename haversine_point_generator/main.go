@@ -116,7 +116,6 @@ func GeneratePointPairs(numPointPairs int, seed int64) ([]PointPair, []float64) 
 			Y1: y1,
 		}
 		distance := Haversine(x0, y0, x1, y1, 6372.8)
-		fmt.Printf("%f, %f, %f, %f = %f\n", x0, y0, x1, y1, distance)
 		distances[i] = distance
 		distanceSum += distance
 	}

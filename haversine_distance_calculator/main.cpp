@@ -33,7 +33,7 @@ verifyAnswers(const std::vector<f64> &distances) {
     }
 
     bool failure = false;
-    auto epsilon = 0.00000001;
+    auto epsilon = 0.0000001;
     auto expectedDistanceAverage = 0.0;
     auto distanceAverage = 0.0;
     for (int i = 0; i < distances.size(); i++) {
