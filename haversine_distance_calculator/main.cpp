@@ -39,9 +39,11 @@ main() {
 
     auto [answers, answerPointPairs] = parseAnswers();
     if (answers.empty()) {
+        std::cout << "failed to parse answers" << std::endl;
         return 1;
     }
 
+    bool failure = false;
     auto epsilon = 0.00000001;
     auto expectedDistanceAverage = 0.0;
     auto distanceAverage = 0.0;
@@ -50,6 +52,7 @@ main() {
         const auto &expectedDistance = answers[i];
         if (!approximatelyEqual(distance, expectedDistance, epsilon)) {
             std::cout << "failed " << distance << " != " << expectedDistance << std::endl;
+            failure = true;
         }
         distanceAverage += distance;
         expectedDistanceAverage += expectedDistance;
@@ -59,6 +62,13 @@ main() {
     expectedDistanceAverage /= static_cast<f64>(distances.size());
     if (!approximatelyEqual(distanceAverage, expectedDistanceAverage, epsilon)) {
         std::cout << "average failed " << distanceAverage << " != " << expectedDistanceAverage << std::endl;
+        failure = true;
+    }
+
+    if (failure) {
+        std::cout << "failure" << std::endl;
+    } else {
+        std::cout << "success" << std::endl;
     }
 
     return 0;
