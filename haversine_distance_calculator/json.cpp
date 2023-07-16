@@ -79,6 +79,78 @@ namespace std {
         ss << "'";
         return ss.str();
     }
+
+    static void
+    indent(int level) {
+        for (int i = 0; i < level; i++) {
+            std::cout << "  ";
+        }
+    }
+
+    static void traverse(JSON::Node *node, int level = 0) {
+        indent(level);
+
+        if (node->type == JSON::NodeType::DICTIONARY) {
+            std::cout << "DICTIONARY: {" << std::endl;
+
+            bool isFirst = true;
+            for (auto n: ((JSON::Dictionary *) node)->dictionary) {
+                if (!isFirst) {
+                    std::cout << std::endl;
+                } else {
+                    isFirst = false;
+                }
+
+                indent(level + 1);
+                std::cout << n.first << std::endl;
+
+                indent(level + 1);
+                std::cout << ":" << std::endl;
+
+                traverse(n.second, level + 1);
+            }
+
+            indent(level);
+            std::cout << "}" << std::endl;
+            return;
+        }
+
+        if (node->type == JSON::NodeType::ARRAY) {
+            std::cout << "ARRAY: [" << std::endl;
+
+            for (auto n: ((JSON::Array *) node)->array) {
+                traverse(n, level + 1);
+            }
+
+            indent(level);
+            std::cout << "]" << std::endl;
+            return;
+        }
+
+        if (node->type == JSON::NodeType::STRING) {
+            std::cout << "STRING: " << ((JSON::String *) node)->s << std::endl;
+            return;
+        }
+
+        if (node->type == JSON::NodeType::INTEGER) {
+            std::cout << "INTEGER: " << ((JSON::Integer *) node)->i << std::endl;
+            return;
+        }
+
+        if (node->type == JSON::NodeType::FLOAT) {
+            std::cout << "FLOAT: " << ((JSON::Float *) node)->f << std::endl;
+            return;
+        }
+
+        if (node->type == JSON::NodeType::BOOLEAN) {
+            std::cout << "BOOL: " << ((JSON::Bool *) node)->b << std::endl;
+            return;
+        }
+    }
+
+    std::string to_string(JSON::Node *node) {
+        traverse(node);
+    }
 }
 
 namespace JSON {
@@ -386,75 +458,6 @@ namespace JSON {
         }
 
         return nullptr;
-    }
-
-    static void
-    indent(int level) {
-        for (int i = 0; i < level; i++) {
-            std::cout << "  ";
-        }
-    }
-
-    void
-    traverse(Node *node, int level = 0) {
-        indent(level);
-
-        if (node->type == NodeType::DICTIONARY) {
-            std::cout << "DICTIONARY: {" << std::endl;
-
-            bool isFirst = true;
-            for (auto n: ((Dictionary *) node)->dictionary) {
-                if (!isFirst) {
-                    std::cout << std::endl;
-                } else {
-                    isFirst = false;
-                }
-
-                indent(level + 1);
-                std::cout << n.first << std::endl;
-
-                indent(level + 1);
-                std::cout << ":" << std::endl;
-
-                traverse(n.second, level + 1);
-            }
-
-            indent(level);
-            std::cout << "}" << std::endl;
-            return;
-        }
-
-        if (node->type == NodeType::ARRAY) {
-            std::cout << "ARRAY: [" << std::endl;
-
-            for (auto n: ((Array *) node)->array) {
-                traverse(n, level + 1);
-            }
-
-            indent(level);
-            std::cout << "]" << std::endl;
-            return;
-        }
-
-        if (node->type == NodeType::STRING) {
-            std::cout << "STRING: " << ((String *) node)->s << std::endl;
-            return;
-        }
-
-        if (node->type == NodeType::INTEGER) {
-            std::cout << "INTEGER: " << ((Integer *) node)->i << std::endl;
-            return;
-        }
-
-        if (node->type == NodeType::FLOAT) {
-            std::cout << "FLOAT: " << ((Float *) node)->f << std::endl;
-            return;
-        }
-
-        if (node->type == NodeType::BOOLEAN) {
-            std::cout << "BOOL: " << ((Bool *) node)->b << std::endl;
-            return;
-        }
     }
 
     Node *
