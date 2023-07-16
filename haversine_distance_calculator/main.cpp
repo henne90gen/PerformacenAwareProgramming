@@ -1,9 +1,10 @@
-#include "haversine.h"
-
 #include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+
+#include "haversine.h"
+#include "metrics.h"
 
 std::pair<std::vector<f64>, std::vector<PointPair>>
 parseAnswers() {
@@ -23,24 +24,12 @@ approximatelyEqual(f64 a, f64 b, f64 epsilon) {
     return std::fabs(a - b) <= ((std::fabs(a) < std::fabs(b) ? std::fabs(b) : std::fabs(a)) * epsilon);
 }
 
-int
-main() {
-    std::cout << std::fixed << std::setw(18) << std::setprecision(18);
-
-    auto pointPairs = ParsePointPairsGeneric("../point_pairs.json");
-
-    std::cout << "parsed " << pointPairs.size() << " pairs" << std::endl;
-
-    if (pointPairs.empty()) {
-        return 1;
-    }
-
-    auto distances = CalculateHaversineDistances(pointPairs);
-
+void
+verifyAnswers(const std::vector<f64> &distances) {
     auto [answers, answerPointPairs] = parseAnswers();
     if (answers.empty()) {
         std::cout << "failed to parse answers" << std::endl;
-        return 1;
+        return;
     }
 
     bool failure = false;
@@ -70,6 +59,44 @@ main() {
     } else {
         std::cout << "success" << std::endl;
     }
+}
+
+void
+increasePrecisionOfFloatPrintout() {
+    std::cout << std::fixed << std::setw(18) << std::setprecision(18);
+    std::cout << "" << std::endl;
+}
+
+int
+main() {
+    // increasePrecisionOfFloatPrintout();
+
+    auto start = ReadCPUTimer();
+
+    auto pointPairs = ParsePointPairsGeneric("../point_pairs.json");
+    if (pointPairs.empty()) {
+        return 1;
+    }
+
+    auto afterParsing = ReadCPUTimer();
+
+    auto distances = CalculateHaversineDistances(pointPairs);
+
+    auto afterDistanceCalculation = ReadCPUTimer();
+
+    auto totalElapsed = afterDistanceCalculation - start;
+    auto totalElapsedF64 = static_cast<f64>(totalElapsed);
+    auto cpuTimerFreq = EstimateCPUTimerFrequency();
+
+    auto parseTime = CPUTimerDiffToNanoseconds(afterParsing - start, cpuTimerFreq);
+    auto parsePercentage = static_cast<f64>(afterParsing - start) / totalElapsedF64 * 100.0;
+    std::cout << "parsing:     " << parsePercentage << "% " << parseTime << "ns" << std::endl;
+
+    auto calculationTime = CPUTimerDiffToNanoseconds(afterDistanceCalculation - afterParsing, cpuTimerFreq);
+    auto calculationPercentage = static_cast<f64>(afterDistanceCalculation - afterParsing) / totalElapsedF64 * 100.0;
+    std::cout << "calculating: " << calculationPercentage << "% " << calculationTime << "ns" << std::endl;
+
+    verifyAnswers(distances);
 
     return 0;
 }

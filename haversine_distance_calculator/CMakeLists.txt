@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.16)
 
 project(haversine)
 
@@ -27,7 +27,7 @@ FetchContent_MakeAvailable(
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_library(haversine haversine.cpp json.cpp reference.cpp)
+add_library(haversine haversine.cpp json.cpp metrics.cpp reference.cpp)
 
 add_executable(haversine_exe main.cpp)
 target_link_libraries(haversine_exe PRIVATE haversine)

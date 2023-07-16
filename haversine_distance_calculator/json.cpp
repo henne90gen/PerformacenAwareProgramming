@@ -79,77 +79,74 @@ namespace std {
         ss << "'";
         return ss.str();
     }
+}
 
-    static void
-    indent(int level) {
-        for (int i = 0; i < level; i++) {
-            std::cout << "  ";
-        }
+static void
+indent(int level) {
+    for (int i = 0; i < level; i++) {
+        std::cout << "  ";
     }
+}
 
-    static void traverse(JSON::Node *node, int level = 0) {
+static void
+traverse(JSON::Node *node, int level = 0) {
+    indent(level);
+
+    if (node->type == JSON::NodeType::DICTIONARY) {
+        std::cout << "DICTIONARY: {" << std::endl;
+
+        bool isFirst = true;
+        for (auto n: ((JSON::Dictionary *) node)->dictionary) {
+            if (!isFirst) {
+                std::cout << std::endl;
+            } else {
+                isFirst = false;
+            }
+
+            indent(level + 1);
+            std::cout << n.first << std::endl;
+
+            indent(level + 1);
+            std::cout << ":" << std::endl;
+
+            traverse(n.second, level + 1);
+        }
+
         indent(level);
-
-        if (node->type == JSON::NodeType::DICTIONARY) {
-            std::cout << "DICTIONARY: {" << std::endl;
-
-            bool isFirst = true;
-            for (auto n: ((JSON::Dictionary *) node)->dictionary) {
-                if (!isFirst) {
-                    std::cout << std::endl;
-                } else {
-                    isFirst = false;
-                }
-
-                indent(level + 1);
-                std::cout << n.first << std::endl;
-
-                indent(level + 1);
-                std::cout << ":" << std::endl;
-
-                traverse(n.second, level + 1);
-            }
-
-            indent(level);
-            std::cout << "}" << std::endl;
-            return;
-        }
-
-        if (node->type == JSON::NodeType::ARRAY) {
-            std::cout << "ARRAY: [" << std::endl;
-
-            for (auto n: ((JSON::Array *) node)->array) {
-                traverse(n, level + 1);
-            }
-
-            indent(level);
-            std::cout << "]" << std::endl;
-            return;
-        }
-
-        if (node->type == JSON::NodeType::STRING) {
-            std::cout << "STRING: " << ((JSON::String *) node)->s << std::endl;
-            return;
-        }
-
-        if (node->type == JSON::NodeType::INTEGER) {
-            std::cout << "INTEGER: " << ((JSON::Integer *) node)->i << std::endl;
-            return;
-        }
-
-        if (node->type == JSON::NodeType::FLOAT) {
-            std::cout << "FLOAT: " << ((JSON::Float *) node)->f << std::endl;
-            return;
-        }
-
-        if (node->type == JSON::NodeType::BOOLEAN) {
-            std::cout << "BOOL: " << ((JSON::Bool *) node)->b << std::endl;
-            return;
-        }
+        std::cout << "}" << std::endl;
+        return;
     }
 
-    std::string to_string(JSON::Node *node) {
-        traverse(node);
+    if (node->type == JSON::NodeType::ARRAY) {
+        std::cout << "ARRAY: [" << std::endl;
+
+        for (auto n: ((JSON::Array *) node)->array) {
+            traverse(n, level + 1);
+        }
+
+        indent(level);
+        std::cout << "]" << std::endl;
+        return;
+    }
+
+    if (node->type == JSON::NodeType::STRING) {
+        std::cout << "STRING: " << ((JSON::String *) node)->s << std::endl;
+        return;
+    }
+
+    if (node->type == JSON::NodeType::INTEGER) {
+        std::cout << "INTEGER: " << ((JSON::Integer *) node)->i << std::endl;
+        return;
+    }
+
+    if (node->type == JSON::NodeType::FLOAT) {
+        std::cout << "FLOAT: " << ((JSON::Float *) node)->f << std::endl;
+        return;
+    }
+
+    if (node->type == JSON::NodeType::BOOLEAN) {
+        std::cout << "BOOL: " << ((JSON::Bool *) node)->b << std::endl;
+        return;
     }
 }
 
