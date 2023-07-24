@@ -13,54 +13,39 @@
 const f64 EARTHS_RADIUS = 6372.8;
 
 std::vector<PointPair>
-ParsePointPairsCustom(const std::string &path) {
-    auto f = std::ifstream(path, std::ios::binary | std::ios::ate);
-    if (!f.is_open()) {
-        std::cerr << "failed to open '" << path << "'" << std::endl;
-        return {};
-    }
-
-    const auto fileSize = f.tellg();
-    f.seekg(0, std::ios::beg);
-
-    auto buf = (char *) malloc(fileSize);
-    if (!f.read(buf, fileSize)) {
-        std::cerr << "failed to read data" << std::endl;
-        return {};
-    }
-
+ParsePointPairsCustom(const Buffer &buffer) {
     auto result = std::vector<PointPair>();
     f64 currentPair[4] = {};
     int currentNum = 0;
     int numberStartIndex = 0;
     bool pairsHaveStarted = false;
-    for (int i = 0; i < fileSize; i++) {
-        if (buf[i] == ']') {
+    for (int i = 0; i < buffer.size; i++) {
+        if (buffer.data[i] == ']') {
             break;
         }
 
-        if (buf[i] == ' ' || buf[i] == '\t' || buf[i] == '\n') {
+        if (buffer.data[i] == ' ' || buffer.data[i] == '\t' || buffer.data[i] == '\n') {
             continue;
         }
 
         if (!pairsHaveStarted) {
-            if (buf[i] == '{') {
+            if (buffer.data[i] == '{') {
                 continue;
             }
-            if (std::string_view(buf + i, 7) == "\"pairs\"") {
+            if (std::string_view(buffer.data + i, 7) == "\"pairs\"") {
                 i += 6;
                 continue;
             }
-            if (buf[i] == ':') {
+            if (buffer.data[i] == ':') {
                 continue;
             }
-            if (buf[i] == '[') {
+            if (buffer.data[i] == '[') {
                 pairsHaveStarted = true;
                 continue;
             }
         }
 
-        if (buf[i] == '{') {
+        if (buffer.data[i] == '{') {
             if (currentNum > 0) {
                 result.emplace_back(currentPair[0], currentPair[1], currentPair[2], currentPair[3]);
             }
@@ -68,17 +53,17 @@ ParsePointPairsCustom(const std::string &path) {
             continue;
         }
 
-        if (buf[i] == '"') {
-            if (std::string_view(buf + i + 1, 2) == "x0") {
+        if (buffer.data[i] == '"') {
+            if (std::string_view(buffer.data + i + 1, 2) == "x0") {
                 currentNum = 0;
             }
-            if (std::string_view(buf + i + 1, 2) == "y0") {
+            if (std::string_view(buffer.data + i + 1, 2) == "y0") {
                 currentNum = 1;
             }
-            if (std::string_view(buf + i + 1, 2) == "x1") {
+            if (std::string_view(buffer.data + i + 1, 2) == "x1") {
                 currentNum = 2;
             }
-            if (std::string_view(buf + i + 1, 2) == "y1") {
+            if (std::string_view(buffer.data + i + 1, 2) == "y1") {
                 currentNum = 3;
             }
             i += 4;
@@ -86,12 +71,12 @@ ParsePointPairsCustom(const std::string &path) {
             continue;
         }
 
-        if (buf[i] == ',' || buf[i] == '}') {
+        if (buffer.data[i] == ',' || buffer.data[i] == '}') {
             auto strLength = i - numberStartIndex;
-            auto strToParse = std::string(buf + numberStartIndex, strLength);
+            auto strToParse = std::string(buffer.data + numberStartIndex, strLength);
             auto d = std::stod(strToParse);
             currentPair[currentNum] = d;
-            if (buf[i] == '}') {
+            if (buffer.data[i] == '}') {
                 // skip the comma after the '}' as well
                 i++;
             }
@@ -104,8 +89,8 @@ ParsePointPairsCustom(const std::string &path) {
     return result;
 }
 
-std::vector<PointPair>
-ParsePointPairsGeneric(const std::string &path) {
+Buffer
+ReadFile(const std::string &path) {
     auto f = std::ifstream(path, std::ios::binary | std::ios::ate);
     if (!f.is_open()) {
         std::cerr << "failed to open '" << path << "'" << std::endl;
@@ -121,7 +106,12 @@ ParsePointPairsGeneric(const std::string &path) {
         return {};
     }
 
-    auto root = JSON::Parse(buf, fileSize);
+    return { buf, (u64) fileSize };
+}
+
+std::vector<PointPair>
+ParsePointPairsGeneric(const Buffer &buf) {
+    auto root = JSON::Parse(buf.data, buf.size);
     if (root == nullptr) {
         return {};
     }

@@ -5,6 +5,14 @@
 
 #include "shared.h"
 
+
+struct Buffer {
+    char *data;
+    u64 size;
+};
+
+Buffer ReadFile(const std::string &path);
+
 struct PointPair {
     f64 x0, y0, x1, y1;
     PointPair(f64 _x0, f64 _y0, f64 _x1, f64 _y1)
@@ -12,8 +20,8 @@ struct PointPair {
 };
 
 std::vector<PointPair>
-ParsePointPairsCustom(const std::string &path);
+ParsePointPairsCustom(const Buffer &buffer);
 std::vector<PointPair>
-ParsePointPairsGeneric(const std::string &path);
+ParsePointPairsGeneric(const Buffer &buffer);
 
 std::vector<f64> CalculateHaversineDistances(const std::vector<PointPair> &pointPairs);

@@ -19,7 +19,8 @@ parseAnswers() {
 }
 
 TEST(HaversineTest, testWithPointParsing) {
-    auto pointPairs = ParsePointPairsCustom("../point_pairs.json");
+    auto buffer = ReadFile("../point_pairs.json");
+    auto pointPairs = ParsePointPairsCustom(buffer);
 
     auto result = parseAnswers();
     auto answers = result.first;
@@ -34,7 +35,8 @@ TEST(HaversineTest, testWithPointParsing) {
 }
 
 TEST(HaversineTest, testJustPointParsingCustom) {
-    auto pointPairs = ParsePointPairsCustom("../point_pairs.json");
+    auto buffer = ReadFile("../point_pairs.json");
+    auto pointPairs = ParsePointPairsCustom(buffer);
 
     auto result = parseAnswers();
     auto expectedPointPairs = result.second;
@@ -50,7 +52,8 @@ TEST(HaversineTest, testJustPointParsingCustom) {
 }
 
 TEST(HaversineTest, testJustPointParsingGeneric) {
-    auto pointPairs = ParsePointPairsGeneric("../point_pairs.json");
+    auto buffer = ReadFile("../point_pairs.json");
+    auto pointPairs = ParsePointPairsGeneric(buffer);
 
     auto result = parseAnswers();
     auto expectedPointPairs = result.second;
