@@ -4,6 +4,8 @@
 #include <sstream>
 #include <string_view>
 
+#include "profiler.h"
+
 namespace JSON {
     enum class TokenType {
         NONE = 0,
@@ -424,6 +426,8 @@ namespace JSON {
 
     Node *
     parseInternal(Context &ctx) {
+        TimeFunction();
+
         Node *dict = parseDict(ctx);
         if (dict != nullptr) {
             return dict;

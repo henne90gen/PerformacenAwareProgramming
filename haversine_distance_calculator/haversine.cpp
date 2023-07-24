@@ -142,6 +142,7 @@ ParsePointPairsGeneric(const Buffer &buf) {
     std::vector<PointPair> result = {};
     auto arr = (JSON::Array *) node;
     for (auto n: arr->array) {
+        TimeBlock("Hello");
         if (n->type != JSON::NodeType::DICTIONARY) {
             delete root;
             return {};

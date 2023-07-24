@@ -4,6 +4,7 @@
 #include <iostream>
 
 Profiler GlobalProfiler = {};
+u32 GlobalProfilerParentIndex = 0;
 
 #if _WIN32
 
@@ -71,13 +72,34 @@ CPUTimerDiffToNanoseconds(u64 cpuTimer, u64 cpuTimerFreq) {
     return cpuTimer / (static_cast<f64>(cpuTimerFreq) / 1000000000.0);
 }
 
-Timer::Timer(const std::string &name) : name(name) {
+Timer::Timer(const std::string &name) : label(name) {
+    u32 index = 0;
+    auto itr = GlobalProfiler.timeAggregateIndices.find(name);
+    if (itr == GlobalProfiler.timeAggregateIndices.end()) {
+        index = GlobalProfiler.nextAggregateIndex++;
+        GlobalProfiler.timeAggregateIndices[name] = index;
+    } else {
+        index = itr->second;
+    }
+
+    parentIndex = GlobalProfilerParentIndex;
+    GlobalProfilerParentIndex = index;
     start = ReadCPUTimer();
 }
 
 Timer::~Timer() {
+    GlobalProfilerParentIndex = parentIndex;
+
     auto end = ReadCPUTimer();
-    GlobalProfiler.measurements.emplace_back(name, start, end);
+    auto elapsed = end - start;
+
+    auto index = GlobalProfiler.timeAggregateIndices[label];
+    auto &parentAggregate = GlobalProfiler.timeAggregates[parentIndex];
+    auto &aggregate = GlobalProfiler.timeAggregates[index];
+
+    parentAggregate.elapsedInChildren += elapsed;
+    aggregate.elapsed += elapsed;
+    aggregate.label = label;
 }
 
 void
@@ -90,14 +112,19 @@ Profiler::Profiler() {
 }
 
 void
-PrintTiming(const std::string &name, u64 cpuTimerFreq, u64 totalElapsedF64, u64 start, u64 end) {
-    auto diff = end - start;
-    auto parseTimeNs = CPUTimerDiffToNanoseconds(diff, cpuTimerFreq);
-    auto parseTimeMs = static_cast<f64>(parseTimeNs) / 1000000.0;
-    auto parsePercentage = static_cast<f64>(diff) / totalElapsedF64 * 100.0;
-    std::cout << std::left << std::setw(35) << name;
-    std::cout << std::fixed << std::setprecision(2) << std::right << std::setw(5) << parsePercentage << "% ";
-    std::cout << std::fixed << std::setprecision(3) << std::right << std::setw(10) << parseTimeMs << "ms" << std::endl;
+PrintTiming(u64 cpuTimerFreq, u64 totalElapsedF64, const TimeAggregate &aggregate) {
+    auto elapsed = aggregate.elapsed - aggregate.elapsedInChildren;
+    auto timeNs = CPUTimerDiffToNanoseconds(elapsed, cpuTimerFreq);
+    auto timeMs = static_cast<f64>(timeNs) / 1000000.0;
+    auto percentage = static_cast<f64>(elapsed) / totalElapsedF64 * 100.0;
+    std::cout << std::left << std::setw(35) << aggregate.label;
+    std::cout << std::fixed << std::setprecision(3) << std::right << std::setw(10) << timeMs << "ms ";
+    std::cout << std::fixed << std::setprecision(2) << std::right << std::setw(5) << percentage << "% ";
+    if (aggregate.elapsedInChildren != 0) {
+        auto percentageWithChildren = static_cast<f64>(aggregate.elapsedInChildren) / totalElapsedF64 * 100.0;
+        std::cout << std::fixed << std::setprecision(2) << std::right << std::setw(6) << percentageWithChildren << "% ";
+    }
+    std::cout << std::endl;
 }
 
 void
@@ -107,7 +134,12 @@ EndProfiling() {
     auto totalElapsedF64 = static_cast<f64>(totalElapsed);
     auto cpuTimerFreq = EstimateCPUTimerFrequency();
 
-    for (const auto &timePair: GlobalProfiler.measurements) {
-        PrintTiming(timePair.name, cpuTimerFreq, totalElapsedF64, timePair.start, timePair.end);
+    for (int i = 0; i < GlobalProfiler.timeAggregates.size(); i++) {
+        const auto &aggregate = GlobalProfiler.timeAggregates[i];
+        if (aggregate.elapsed == 0) {
+            continue;
+        }
+
+        PrintTiming(cpuTimerFreq, totalElapsedF64, aggregate);
     }
 }
