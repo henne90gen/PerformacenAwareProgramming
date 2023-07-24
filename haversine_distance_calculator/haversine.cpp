@@ -8,6 +8,7 @@
 
 #include "haversine.h"
 #include "json.h"
+#include "profiler.h"
 #include "reference.h"
 
 const f64 EARTHS_RADIUS = 6372.8;
@@ -91,6 +92,8 @@ ParsePointPairsCustom(const Buffer &buffer) {
 
 Buffer
 ReadFile(const std::string &path) {
+    TimeFunction();
+
     auto f = std::ifstream(path, std::ios::binary | std::ios::ate);
     if (!f.is_open()) {
         std::cerr << "failed to open '" << path << "'" << std::endl;
@@ -111,6 +114,8 @@ ReadFile(const std::string &path) {
 
 std::vector<PointPair>
 ParsePointPairsGeneric(const Buffer &buf) {
+    TimeFunction();
+
     auto root = JSON::Parse(buf.data, buf.size);
     if (root == nullptr) {
         return {};
@@ -176,6 +181,8 @@ ParsePointPairsGeneric(const Buffer &buf) {
 
 std::vector<f64>
 CalculateHaversineDistances(const std::vector<PointPair> &pointPairs) {
+    TimeFunction();
+
     auto result = std::vector<f64>();
     result.reserve(pointPairs.size());
 
