@@ -1,3 +1,5 @@
+#pragma once
+
 #include "shared.h"
 
 #include <array>
@@ -18,15 +20,6 @@ ReadCPUTimer(void) {
     return __rdtsc();
 }
 
-struct Timer {
-    u64 parentIndex = 0;
-    std::string label = {};
-    u64 start = 0;
-
-    Timer(const std::string &name);
-    ~Timer();
-};
-
 struct TimeAggregate {
     std::string label = {};
     u64 elapsed = 0;
@@ -43,6 +36,43 @@ struct Profiler {
 };
 
 extern Profiler GlobalProfiler;
+extern u32 GlobalProfilerParentIndex;
+
+struct Timer {
+    u64 parentIndex = 0;
+    std::string label = {};
+    u64 start = 0;
+
+    inline Timer(const std::string &name) : label(name) {
+        u32 index = 0;
+        auto itr = GlobalProfiler.timeAggregateIndices.find(name);
+        if (itr == GlobalProfiler.timeAggregateIndices.end()) {
+            index = GlobalProfiler.nextAggregateIndex++;
+            GlobalProfiler.timeAggregateIndices[name] = index;
+        } else {
+            index = itr->second;
+        }
+
+        parentIndex = GlobalProfilerParentIndex;
+        GlobalProfilerParentIndex = index;
+        start = ReadCPUTimer();
+    }
+
+    inline ~Timer() {
+        GlobalProfilerParentIndex = parentIndex;
+
+        auto end = ReadCPUTimer();
+        auto elapsed = end - start;
+
+        auto index = GlobalProfiler.timeAggregateIndices[label];
+        auto &parentAggregate = GlobalProfiler.timeAggregates[parentIndex];
+        auto &aggregate = GlobalProfiler.timeAggregates[index];
+
+        parentAggregate.elapsedInChildren += elapsed;
+        aggregate.elapsed += elapsed;
+        aggregate.label = label;
+    }
+};
 
 void BeginProfiling();
 void EndProfiling();

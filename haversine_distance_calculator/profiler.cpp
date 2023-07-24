@@ -72,36 +72,6 @@ CPUTimerDiffToNanoseconds(u64 cpuTimer, u64 cpuTimerFreq) {
     return cpuTimer / (static_cast<f64>(cpuTimerFreq) / 1000000000.0);
 }
 
-Timer::Timer(const std::string &name) : label(name) {
-    u32 index = 0;
-    auto itr = GlobalProfiler.timeAggregateIndices.find(name);
-    if (itr == GlobalProfiler.timeAggregateIndices.end()) {
-        index = GlobalProfiler.nextAggregateIndex++;
-        GlobalProfiler.timeAggregateIndices[name] = index;
-    } else {
-        index = itr->second;
-    }
-
-    parentIndex = GlobalProfilerParentIndex;
-    GlobalProfilerParentIndex = index;
-    start = ReadCPUTimer();
-}
-
-Timer::~Timer() {
-    GlobalProfilerParentIndex = parentIndex;
-
-    auto end = ReadCPUTimer();
-    auto elapsed = end - start;
-
-    auto index = GlobalProfiler.timeAggregateIndices[label];
-    auto &parentAggregate = GlobalProfiler.timeAggregates[parentIndex];
-    auto &aggregate = GlobalProfiler.timeAggregates[index];
-
-    parentAggregate.elapsedInChildren += elapsed;
-    aggregate.elapsed += elapsed;
-    aggregate.label = label;
-}
-
 void
 BeginProfiling() {
     GlobalProfiler = {};
