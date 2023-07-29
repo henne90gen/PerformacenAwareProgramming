@@ -22,8 +22,9 @@ ReadCPUTimer(void) {
 
 struct TimeAggregate {
     std::string label = {};
-    u64 elapsed = 0;
-    u64 elapsedInChildren = 0;
+    u64 elapsedWithoutChildren = 0;
+    u64 elapsedWithChildren = 0;
+    u64 hitCount = 0;
 };
 
 struct Profiler {
@@ -39,9 +40,10 @@ extern Profiler GlobalProfiler;
 extern u32 GlobalProfilerParentIndex;
 
 struct Timer {
-    u64 parentIndex = 0;
     std::string label = {};
+    u64 parentIndex = 0;
     u64 start = 0;
+    u64 oldElapsedWithChildren = 0;
 
     inline Timer(const std::string &name) : label(name) {
         u32 index = 0;
@@ -53,6 +55,8 @@ struct Timer {
             index = itr->second;
         }
 
+        auto &aggregate = GlobalProfiler.timeAggregates[index];
+        oldElapsedWithChildren = aggregate.elapsedWithChildren;
         parentIndex = GlobalProfilerParentIndex;
         GlobalProfilerParentIndex = index;
         start = ReadCPUTimer();
@@ -68,8 +72,10 @@ struct Timer {
         auto &parentAggregate = GlobalProfiler.timeAggregates[parentIndex];
         auto &aggregate = GlobalProfiler.timeAggregates[index];
 
-        parentAggregate.elapsedInChildren += elapsed;
-        aggregate.elapsed += elapsed;
+        parentAggregate.elapsedWithoutChildren -= elapsed;
+        aggregate.elapsedWithoutChildren += elapsed;
+        aggregate.elapsedWithChildren = oldElapsedWithChildren + elapsed;
+        aggregate.hitCount++;
         aggregate.label = label;
     }
 };
