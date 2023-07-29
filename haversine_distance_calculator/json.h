@@ -20,20 +20,21 @@ namespace JSON {
         NodeType type;
 
         explicit Node(NodeType t) : type(t) {}
+        virtual ~Node() = default;
     };
 
     struct Dictionary : public Node {
         std::unordered_map<std::string, Node *> dictionary;
 
         explicit Dictionary(std::unordered_map<std::string, Node *> d) : Node(NodeType::DICTIONARY), dictionary(d) {}
-        ~Dictionary();
+        virtual ~Dictionary() override;
     };
 
     struct Array : public Node {
         std::vector<Node *> array;
 
         explicit Array(std::vector<Node *> a) : Node(NodeType::ARRAY), array(a) {}
-        ~Array();
+        virtual ~Array() override;
     };
 
     struct String : public Node {

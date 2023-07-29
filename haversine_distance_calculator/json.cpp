@@ -426,8 +426,6 @@ namespace JSON {
 
     Node *
     parseInternal(Context &ctx) {
-        TimeFunction();
-
         Node *dict = parseDict(ctx);
         if (dict != nullptr) {
             return dict;
