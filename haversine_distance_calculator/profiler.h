@@ -86,5 +86,11 @@ void EndProfiling();
 #define CAT_(a, b) a##b
 #define CAT(a, b) CAT_(a, b)
 
+#define PROFILING_ENABLED 1
+#if PROFILING_ENABLED
 #define TimeFunction() Timer CAT(t, __LINE__)(__func__)
 #define TimeBlock(name) Timer CAT(t, __LINE__)(name)
+#else
+#define TimeFunction()
+#define TimeBlock(...)
+#endif
