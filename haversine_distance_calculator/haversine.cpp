@@ -175,7 +175,10 @@ ParsePointPairsGeneric(const Buffer &buf) {
         result.emplace_back(((JSON::Float *) itrX0->second)->f, ((JSON::Float *) itrY0->second)->f, ((JSON::Float *) itrX1->second)->f, ((JSON::Float *) itrY1->second)->f);
     }
 
-    delete root;
+    {
+        TimeBlock("Free JSON");
+        delete root;
+    }
     return result;
 }
 
