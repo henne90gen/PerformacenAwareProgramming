@@ -89,7 +89,7 @@ PrintTiming(u64 cpuTimerFreq, u64 totalElapsedF64, const TimeAggregate &aggregat
     auto percentage = static_cast<f64>(elapsed) / totalElapsedF64 * 100.0;
     std::cout << std::left << std::setw(35) << aggregate.label
               << std::right << std::setw(10) << aggregate.hitCount
-              << std::fixed << std::setprecision(3) << std::right << std::setw(10) << timeMs << "ms "
+              << std::fixed << std::setprecision(3) << std::right << std::setw(12) << timeMs << "ms "
               << std::fixed << std::setprecision(2) << std::right << std::setw(7) << percentage << "% ";
     if (aggregate.elapsedWithChildren != elapsed) {
         auto percentageWithChildren = static_cast<f64>(aggregate.elapsedWithChildren) / totalElapsedF64 * 100.0;
@@ -107,7 +107,7 @@ EndProfiling() {
 
     std::cout << std::left << std::setw(35) << "Name"
               << std::right << std::setw(10) << "Hits"
-              << std::right << std::setw(12) << "Time"
+              << std::right << std::setw(14) << "Time"
               << std::right << std::setw(9) << "Percent"
               << " Percent with Children" << std::endl;
     for (int i = 0; i < GlobalProfiler.timeAggregates.size(); i++) {
@@ -120,5 +120,5 @@ EndProfiling() {
     }
 
     auto timeMs = totalElapsedF64 / 1000000.0;
-    std::cout << std::left << std::setw(45) << "Total" << std::right << std::fixed << std::setprecision(3) << std::setw(10) << timeMs << "ms" << std::endl;
+    std::cout << std::left << std::setw(45) << "Total" << std::right << std::fixed << std::setprecision(3) << std::setw(12) << timeMs << "ms" << std::endl;
 }

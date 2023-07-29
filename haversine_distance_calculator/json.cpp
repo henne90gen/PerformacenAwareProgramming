@@ -461,6 +461,8 @@ namespace JSON {
 
     Node *
     Parse(char *buf, int length) {
+        TimeFunction();
+
         Context ctx = { buf, length, 0 };
         auto root = parseInternal(ctx);
         if (root == nullptr) {
